@@ -1,0 +1,28 @@
+{
+  "name": "@webcat/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WebCat CLI entry point",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "webcat": "./dist/main.mjs"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/main.ts",
+    "dev:server": "tsx src/main.ts server run",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@webcat/server": "workspace:^",
+    "@webcat/shared": "workspace:^",
+    "@webcat/mcp-hub": "workspace:^",
+    "@webcat/scope-engine": "workspace:^"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}
