@@ -1,0 +1,38 @@
+{
+  "name": "@webcat/monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WebCat — Local-first AI-assisted web-application penetration-testing platform",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "build:packages": "pnpm -r --filter './packages/*' run build",
+    "dev:cli": "pnpm -C apps/webcat-cli run dev",
+    "dev:web": "pnpm -C apps/webcat-web run dev",
+    "dev:server": "pnpm -C apps/webcat-cli run dev:server",
+    "typecheck": "pnpm -r --filter './packages/*' run typecheck && pnpm --filter @webcat/cli run typecheck && pnpm --filter @webcat/web run typecheck",
+    "lint": "oxlint --type-aware",
+    "lint:fix": "pnpm run lint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "pnpm -r run clean"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.30.0",
+    "@types/node": "^22.20.1",
+    "@vitest/coverage-v8": "^3.0.0",
+    "oxlint": "^1.59.0",
+    "typescript": "~5.7.0",
+    "vitest": "^3.2.7"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+    "fastify": "^5.10.0",
+    "ws": "^8.21.0"
+  }
+}

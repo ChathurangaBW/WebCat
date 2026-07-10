@@ -1,0 +1,29 @@
+{
+  "name": "@webcat/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local REST + WebSocket server for WebCat",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@webcat/protocol": "workspace:^",
+    "@webcat/shared": "workspace:^",
+    "@webcat/mcp-hub": "workspace:^",
+    "@webcat/scope-engine": "workspace:^",
+    "fastify": "^5.1.0",
+    "ws": "^8.18.0",
+    "zod": "catalog:"
+  }
+}
