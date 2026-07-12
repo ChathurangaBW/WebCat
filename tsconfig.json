@@ -1,18 +1,10 @@
 {
-  "compilerOptions": {
-    "target": "ES2023",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": "."
-  },
-  "exclude": ["node_modules", "dist", ".webcat"]
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/mcp-gateway" },
+    { "path": "packages/agent-profiles" },
+    { "path": "apps/webcat" }
+  ]
 }

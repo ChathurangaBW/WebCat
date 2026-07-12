@@ -1,83 +1,59 @@
-# 🐱 WebCat
+# WebCat
 
-**Local-first, AI-assisted web-application penetration-testing platform.**
+WebCat is a **CLI/TUI-first AI swarm for authorized web-application penetration testing**. It is designed as a native extension path for the Kimi Code agent architecture, with generic Model Context Protocol (MCP) integration for Caido, Burp Suite, ZAP, browser tooling, and custom security tools.
 
-WebCat combines an AI agent runtime with MCP-agnostic proxy integrations, a mandatory scope-enforcement engine, and evidence-based reporting. It helps security professionals conduct thorough, authorized penetration tests with AI assistance while maintaining strict security boundaries.
+## Current foundation
 
-## Features
+- TypeScript and Node.js monorepo
+- `webcat` CLI entry point
+- explicit engagement authorization and target scope
+- deny-by-default scope evaluation
+- MCP capability abstraction and risk classification
+- native specialist-agent profile catalog
+- evidence-first validation workflow
+- no browser dashboard or standalone REST platform
 
-- **🤖 Agent Swarm** — Specialized AI agents for reconnaissance, analysis, validation, and reporting
-- **🔌 MCP-Agnostic Hub** — Connect any MCP-compatible proxy (Caido, Burp Suite, OWASP ZAP, browser automation, custom)
-- **🛡️ Scope Engine** — Mandatory security boundary enforcing allowed targets, blocking private networks, preventing DNS rebinding
-- **📊 Evidence System** — Chain-of-custody tracking, SHA-256 hashing, redacted and encrypted evidence storage
-- **🔍 Finding Management** — Structured findings with CWE/OWASP mapping, deduplication, severity scoring
-- **📝 Report Generation** — Markdown, HTML, and JSON export with evidence references
-- **🌐 Web Interface** — Vue 3 dashboard for engagements, traffic, findings, approvals, and settings
-- **🔒 Security by Default** — Secret redaction, immutable audit logs, RBAC, trust levels
+## Repository layout
 
-## Quick Start
+```text
+apps/webcat/                 CLI/TUI application
+packages/core/               engagement, scope, workflow, evidence types
+packages/mcp-gateway/        MCP capability and policy gateway
+packages/agent-profiles/     native WebCat specialist profiles
+skills/                      reusable swarm procedures
+docs/architecture.md         architecture and execution flow
+```
+
+## Development
 
 ```bash
-# Install
-git clone https://github.com/ChathurangaBW/WebCat.git
-cd WebCat
+corepack enable
 pnpm install
-
-# Start the server
-pnpm dev:server
-
-# In another terminal, start the web UI
-pnpm dev:web
-
-# Open http://localhost:5173
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm dev -- --help
 ```
 
-## Commands
+## Intended runtime flow
 
-```bash
-webcat                    # Start full WebCat platform
-webcat server run         # Start server only
-webcat server run --port 8080
-webcat --help
+```text
+webcat CLI/TUI
+  -> engagement authorization
+  -> scope validation
+  -> MCP server discovery
+  -> passive mapping
+  -> specialist-agent dispatch
+  -> scoped tool execution
+  -> evidence collection
+  -> independent validation
+  -> reporting
 ```
 
-## Configuration
+## Safety model
 
-| Scope | Path |
-|---|---|
-| User global | `~/.webcat/config.json` |
-| User MCP | `~/.webcat/mcp.json` |
-| Project | `.webcat/config.json` |
-| Environment | `WEBCAT_*` variables |
+WebCat is for systems you own or are explicitly authorized to test. Active MCP calls are denied when authorization or scope is absent. Redirects and derived targets must be re-evaluated before execution.
 
-## Architecture
+## Upstream
 
-```
-apps/
-  webcat-cli/          CLI entry (webcat command)
-  webcat-web/          Vue 3 browser application
-packages/
-  shared/              Core types, redaction, errors
-  protocol/            REST + WebSocket schemas
-  scope-engine/        Central scope enforcement
-  mcp-hub/             MCP integration hub
-  server/              Fastify REST + WebSocket server
-  agent-core/          Agent runtime engine
-```
-
-## Upstream Attribution
-
-WebCat builds on architecture patterns from:
-
-- **Kimi Code** by Moonshot AI — Agent runtime, server, and protocol architecture (MIT)
-- **Caido MCP Server** by c0tton-fluff — Proxy integration patterns (MIT)
-
-See [NOTICE.md](NOTICE.md) for details. WebCat is not affiliated with these projects.
-
-## License
-
-MIT — See [LICENSE](LICENSE)
-
-## Security
-
-WebCat is designed for **authorized testing only**. Every engagement requires explicit authorization affirmation and scope definition. See [SECURITY.md](SECURITY.md).
+The implementation direction is based on the MIT-licensed MoonshotAI Kimi Code architecture. External MCP servers remain separate processes and retain their own licenses. WebCat is not affiliated with or endorsed by Moonshot AI, Caido, PortSwigger, or OWASP.

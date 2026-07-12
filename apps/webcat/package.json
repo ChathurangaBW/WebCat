@@ -1,0 +1,23 @@
+{
+  "name": "@webcat/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "webcat": "dist/main.js" },
+  "scripts": {
+    "dev": "tsx src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@webcat/agent-profiles": "workspace:*",
+    "@webcat/core": "workspace:*",
+    "@webcat/mcp-gateway": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.0.18"
+  }
+}
