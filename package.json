@@ -1,21 +1,13 @@
 {
   "name": "webcat",
-  "version": "0.1.0",
-  "private": true,
-  "description": "CLI/TUI-first AI swarm for authorized web application penetration testing",
+  "version": "1.0.0",
+  "description": "Terminal-native AI swarm for authorized web application security assessment",
   "license": "MIT",
   "type": "module",
-  "packageManager": "pnpm@10.33.0",
-  "engines": { "node": ">=22.19.0" },
+  "bin": { "webcat": "./webcat.mjs" },
   "scripts": {
-    "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
-    "dev": "pnpm --filter @webcat/cli dev"
+    "start": "node webcat.mjs",
+    "test": "node webcat.mjs --version && node webcat.mjs --help"
   },
-  "devDependencies": {
-    "typescript": "^6.0.2",
-    "tsx": "^4.21.0",
-    "vitest": "^4.0.18"
-  }
+  "engines": { "node": ">=22.0.0" }
 }
