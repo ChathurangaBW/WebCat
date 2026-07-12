@@ -1,17 +1,18 @@
-[product]
-mode = "manual"
+[provider]
+type = "chat-completions"
+baseUrl = "http://127.0.0.1:11434/v1"
+apiKeyEnv = "WEBCAT_MODEL_API_KEY"
+model = "webcat-model"
+timeoutMs = 120000
+maxTokens = 4096
+temperature = 0.1
 
-[execution]
-max_parallel_agents = 4
-max_requests_per_second = 2
+[swarm]
+maxConcurrency = 4
+maxAgentTurns = 10
+maxRetries = 2
 
 [security]
-deny_unknown_mcp_tools = true
-require_approval_for_high_risk = true
-redact_sensitive_headers = true
-
-[mcp.caido]
-enabled = false
-transport = "stdio"
-command = "caido-mcp-server"
-args = ["serve"]
+redactSecrets = true
+maxEvidenceBytes = 1048576
+requireApprovalForActive = false

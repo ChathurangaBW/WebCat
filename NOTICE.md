@@ -1,5 +1,7 @@
 # Notices
 
-WebCat is an independent project. Its architecture is intended to extend concepts from the MIT-licensed [MoonshotAI/kimi-code](https://github.com/MoonshotAI/kimi-code) project. Preserve all upstream copyright and license notices when upstream source is imported.
+WebCat is an independent open-source product distributed under the MIT License.
 
-MCP integrations such as Caido, Burp Suite, ZAP, and browser automation run as external servers and remain governed by their respective licenses and terms.
+External model providers and MCP servers are separate components. Their software, services, credentials, data handling, and usage terms remain governed by their respective owners and configurations.
+
+WebCat does not claim affiliation with or endorsement by any external security-tool, proxy, browser-automation, model, or platform vendor.

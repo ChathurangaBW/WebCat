@@ -1,21 +1,25 @@
 {
   "name": "webcat",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "CLI/TUI-first AI swarm for authorized web application penetration testing",
+  "description": "Terminal-native AI swarm for authorized web application security assessment",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
-  "engines": { "node": ">=22.19.0" },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
-    "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
-    "dev": "pnpm --filter @webcat/cli dev"
+    "clean": "find apps packages -type d -name dist -prune -exec rm -rf {} + && find apps packages -name '*.tsbuildinfo' -delete",
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "test": "npm run build && node --test packages/*/dist/*.test.js apps/*/dist/*.test.js",
+    "start": "node apps/webcat/dist/main.js",
+    "dev": "npm run build && node apps/webcat/dist/main.js",
+    "smoke": "npm run build && node apps/webcat/dist/main.js --version && node apps/webcat/dist/main.js help",
+    "package": "npm run build && node scripts/package.mjs"
   },
   "devDependencies": {
-    "typescript": "^6.0.2",
-    "tsx": "^4.21.0",
-    "vitest": "^4.0.18"
+    "typescript": "^5.8.3"
   }
 }

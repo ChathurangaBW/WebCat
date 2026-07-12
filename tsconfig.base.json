@@ -10,6 +10,13 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "declaration": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@webcat/core": ["packages/core/src/index.ts"],
+      "@webcat/mcp-gateway": ["packages/mcp-gateway/src/index.ts"],
+      "@webcat/agent-profiles": ["packages/agent-profiles/src/index.ts"],
+      "@webcat/agent-runtime": ["packages/agent-runtime/src/index.ts"]
+    }
   }
 }

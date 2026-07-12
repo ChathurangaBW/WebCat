@@ -1,9 +1,11 @@
 node_modules/
 dist/
-coverage/
 *.tsbuildinfo
+.webcat/state/
+.webcat/evidence/
+.webcat/reports/
+.webcat/audit.jsonl
 .env
-.env.*
-.webcat/
-.DS_Store
 *.log
+.DS_Store
+release/

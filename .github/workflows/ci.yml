@@ -1,10 +1,8 @@
 name: CI
-
 on:
   pull_request:
   push:
     branches: [main]
-
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -13,8 +11,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: corepack enable
-      - run: pnpm install --no-frozen-lockfile
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - run: pnpm install --frozen-lockfile=false
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm build
+      - run: pnpm package
+      - run: node release/webcat/dist/cli/main.js --version
+      - run: node release/webcat/dist/cli/main.js help

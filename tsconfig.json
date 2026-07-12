@@ -5,6 +5,7 @@
     { "path": "packages/core" },
     { "path": "packages/mcp-gateway" },
     { "path": "packages/agent-profiles" },
+    { "path": "packages/agent-runtime" },
     { "path": "apps/webcat" }
   ]
 }

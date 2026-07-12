@@ -1,13 +1,5 @@
 ---
 name: pre-phase-briefing
-description: Establish codebase and engagement reality before each phase
+description: Establish current evidence, scope and unresolved risks before a swarm phase
 ---
-
-Before starting a phase:
-
-1. read the current engagement and workflow state;
-2. confirm authorization and scope are still valid;
-3. review prior phase outputs and unresolved blockers;
-4. list the exact MCP capabilities available;
-5. define non-overlapping specialist tasks and evidence requirements;
-6. stop if required facts are missing instead of inventing them.
+Read engagement scope, current state, previous evidence and retrospectives. State the phase objective, assigned lane, exclusions, expected evidence, stop conditions and handoff format. Do not begin active work when authorization or scope is unresolved.

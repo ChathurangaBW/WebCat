@@ -1,0 +1,3 @@
+import readline from "node:readline";
+const rl=readline.createInterface({input:process.stdin});
+rl.on("line",(line:string)=>{const m=JSON.parse(line);if(m.id===undefined)return;let result:any={};if(m.method==="initialize")result={protocolVersion:"2025-03-26",capabilities:{tools:{}},serverInfo:{name:"mock",version:"1"}};else if(m.method==="tools/list")result={tools:[{name:"get_history",description:"read history",inputSchema:{type:"object",properties:{}},annotations:{readOnlyHint:true}}]};else if(m.method==="tools/call")result={content:[{type:"text",text:JSON.stringify({ok:true,name:m.params.name})}]};process.stdout.write(JSON.stringify({jsonrpc:"2.0",id:m.id,result})+"\n");});

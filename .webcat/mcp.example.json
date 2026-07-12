@@ -1,0 +1,24 @@
+{
+  "servers": {
+    "proxy": {
+      "transport": "stdio",
+      "command": "security-proxy-mcp",
+      "args": ["serve"],
+      "enabled": false,
+      "timeoutMs": 60000,
+      "enabledTools": [],
+      "disabledTools": [],
+      "capabilityMap": {
+        "custom_history": { "name": "proxy.history.list", "risk": "read" },
+        "custom_replay": { "name": "proxy.request.replay", "risk": "active" }
+      }
+    },
+    "remote-tools": {
+      "transport": "http",
+      "url": "http://127.0.0.1:9876/mcp",
+      "enabled": false,
+      "timeoutMs": 60000,
+      "headers": { "Authorization": "${WEBCAT_MCP_AUTHORIZATION}" }
+    }
+  }
+}

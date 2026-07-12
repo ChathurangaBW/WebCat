@@ -1,42 +1,28 @@
 import type { WorkflowState } from "./types.js";
 
-const transitions: Readonly<Record<WorkflowState, readonly WorkflowState[]>> = {
+const transitions: Record<WorkflowState, WorkflowState[]> = {
   NEW: ["AUTHORIZATION_REQUIRED", "SCOPE_READY", "BLOCKED"],
   AUTHORIZATION_REQUIRED: ["SCOPE_READY", "BLOCKED"],
-  SCOPE_READY: ["MCP_DISCOVERY", "PAUSED", "BLOCKED"],
-  MCP_DISCOVERY: ["PASSIVE_MAPPING", "PAUSED", "BLOCKED"],
-  PASSIVE_MAPPING: ["ATTACK_SURFACE_READY", "PAUSED", "BLOCKED"],
-  ATTACK_SURFACE_READY: ["HYPOTHESIS_GENERATION", "PAUSED", "BLOCKED"],
-  HYPOTHESIS_GENERATION: ["ACTIVE_VALIDATION", "FINDING_REVIEW", "PAUSED", "BLOCKED"],
-  ACTIVE_VALIDATION: ["FINDING_REVIEW", "HYPOTHESIS_GENERATION", "PAUSED", "BLOCKED"],
-  FINDING_REVIEW: ["REPORT_READY", "ACTIVE_VALIDATION", "PAUSED", "BLOCKED"],
-  REPORT_READY: ["COMPLETED", "FINDING_REVIEW", "PAUSED", "BLOCKED"],
+  SCOPE_READY: ["MCP_DISCOVERY", "PASSIVE_MAPPING", "BLOCKED"],
+  MCP_DISCOVERY: ["PASSIVE_MAPPING", "BLOCKED", "FAILED"],
+  PASSIVE_MAPPING: ["ATTACK_SURFACE_READY", "PAUSED", "FAILED"],
+  ATTACK_SURFACE_READY: ["HYPOTHESIS_GENERATION", "PAUSED"],
+  HYPOTHESIS_GENERATION: ["ACTIVE_VALIDATION", "REPORT_READY", "PAUSED"],
+  ACTIVE_VALIDATION: ["FINDING_REVIEW", "PAUSED", "FAILED"],
+  FINDING_REVIEW: ["ACTIVE_VALIDATION", "REPORT_READY", "PAUSED"],
+  REPORT_READY: ["COMPLETED", "FAILED"],
   COMPLETED: [],
-  PAUSED: [
-    "SCOPE_READY",
-    "MCP_DISCOVERY",
-    "PASSIVE_MAPPING",
-    "ATTACK_SURFACE_READY",
-    "HYPOTHESIS_GENERATION",
-    "ACTIVE_VALIDATION",
-    "FINDING_REVIEW",
-    "REPORT_READY",
-    "BLOCKED",
-  ],
-  BLOCKED: ["AUTHORIZATION_REQUIRED", "SCOPE_READY", "PAUSED"],
+  PAUSED: ["PASSIVE_MAPPING", "HYPOTHESIS_GENERATION", "ACTIVE_VALIDATION", "FINDING_REVIEW", "REPORT_READY"],
+  BLOCKED: ["SCOPE_READY", "PAUSED"],
+  FAILED: ["PAUSED", "SCOPE_READY"]
 };
 
-export function canTransition(from: WorkflowState, to: WorkflowState): boolean {
-  return transitions[from].includes(to);
-}
-
-export class WorkflowStateMachine {
+export class WorkflowMachine {
   public constructor(public state: WorkflowState = "NEW") {}
-
-  public transition(to: WorkflowState): void {
-    if (!canTransition(this.state, to)) {
-      throw new Error(`invalid WebCat workflow transition: ${this.state} -> ${to}`);
-    }
-    this.state = to;
+  public canTransition(next: WorkflowState): boolean { return transitions[this.state].includes(next); }
+  public transition(next: WorkflowState): WorkflowState {
+    if (!this.canTransition(next)) throw new Error(`invalid workflow transition ${this.state} -> ${next}`);
+    this.state = next;
+    return this.state;
   }
 }

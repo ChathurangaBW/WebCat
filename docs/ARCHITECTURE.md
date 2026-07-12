@@ -1,36 +1,48 @@
-# WebCat architecture
+# WebCat Architecture
 
 ```text
-WebCat CLI/TUI
-  -> Kimi session runtime
-  -> WebCat orchestrator profile
-  -> native Agent / AgentSwarm specialists
-  -> MCP capability gateway
-  -> scope + permission + approval enforcement
-  -> Caido / Burp / ZAP / browser / custom MCP
-  -> evidence pipeline
-  -> validator and critic gates
-  -> validated findings
-  -> terminal and file reports
+WebCat CLI / Terminal Workspace
+            |
+            v
+Session + Workflow Runtime
+            |
+            v
+Swarm Orchestrator ---- Skills Catalog
+      |        |        |
+      v        v        v
+Specialist Agents / Validator / Critic
+            |
+            v
+MCP Capability Gateway
+  discovery -> classification -> scope -> approval -> rate limit -> execution
+            |
+            v
+External MCP Servers
+            |
+            v
+Evidence / Hypotheses / Findings / Audit / Reports
 ```
 
-## Architectural rules
+## Packages
 
-1. WebCat remains terminal-first. No browser dashboard or required REST server.
-2. Agent profiles must use Kimi's native profile-contribution system.
-3. Parallel work must use Kimi's native Agent and AgentSwarm lifecycle.
-4. MCP servers remain external processes or endpoints; WebCat provides protocol integration and policy enforcement.
-5. Scope enforcement must execute inside the MCP invocation path. Fail-open hooks are not a sufficient security boundary.
-6. Vendor-specific MCP tools are normalized to stable WebCat capabilities.
-7. A specialist produces candidates; a validator and critic control publication.
-8. State, evidence, audit events, hypotheses, and findings remain resumable under `.webcat/`.
+- `@webcat/core` — configuration, scope, workflow, state, approvals, evidence, findings, skills, reporting
+- `@webcat/mcp-gateway` — MCP transports, clients, discovery, capability mapping, execution guard
+- `@webcat/agent-profiles` — native WebCat specialist profiles
+- `@webcat/agent-runtime` — model client, agent loop, bounded scheduler, validation pipeline
+- `@webcat/cli` — commands and terminal workspace
 
-## Intended package placement after upstream import
+## Enforcement path
 
-The final implementation should move these domains into the checked-out Kimi monorepo rather than maintain a parallel agent runtime:
+Every external tool call follows the same path:
 
-- product identity and CLI: `apps/kimi-code` renamed/rebranded to WebCat
-- profiles: `packages/agent-core-v2/src/agent/webcat/profiles`
-- engagement and scope services: `packages/agent-core-v2/src/webcat`
-- MCP policy gateway: adjacent to the existing MCP client execution path
-- skills: project, plugin, or built-in WebCat skills using Kimi's native loader
+1. resolve the MCP tool to a WebCat capability;
+2. classify risk as read, active, high, or destructive;
+3. extract and normalize target URLs;
+4. evaluate every target against allow and deny rules;
+5. enforce authorization and engagement risk settings;
+6. resolve operator approval requirements;
+7. acquire request-rate and concurrency limits;
+8. execute through the MCP transport;
+9. redact and persist evidence and audit records.
+
+Core enforcement is implemented in the gateway execution path. It does not depend on prompts or optional hooks.

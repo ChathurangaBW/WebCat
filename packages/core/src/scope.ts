@@ -1,53 +1,49 @@
-import type {
-  Engagement,
-  OperationKind,
-  ScopeDecision,
-  ScopeRule,
-} from "./types.js";
+import net from "node:net";
+import type { Engagement, OperationKind, ScopeDecision, ScopeRule } from "./types.js";
 
 function normalizePath(pathname: string): string {
-  const decoded = decodeURIComponent(pathname);
-  const segments = decoded.split("/");
+  let decoded: string;
+  try { decoded = decodeURIComponent(pathname); } catch { decoded = pathname; }
   const output: string[] = [];
-
-  for (const segment of segments) {
+  for (const segment of decoded.replace(/\\/g, "/").split("/")) {
     if (!segment || segment === ".") continue;
-    if (segment === "..") output.pop();
-    else output.push(segment);
+    if (segment === "..") output.pop(); else output.push(segment);
   }
-
-  return `/${output.join("/")}${decoded.endsWith("/") && output.length > 0 ? "/" : ""}`;
+  return `/${output.join("/")}${decoded.endsWith("/") && output.length ? "/" : ""}`;
 }
 
 function hostMatches(ruleHost: string, targetHost: string): boolean {
-  const rule = ruleHost.toLowerCase();
-  const target = targetHost.toLowerCase();
+  const rule = ruleHost.toLowerCase().replace(/\.$/, "");
+  const target = targetHost.toLowerCase().replace(/\.$/, "");
   if (rule.startsWith("*.")) {
-    const suffix = rule.slice(1);
-    return target.endsWith(suffix) && target !== suffix.slice(1);
+    const suffix = rule.slice(2);
+    return target.endsWith(`.${suffix}`) && target !== suffix;
   }
   return rule === target;
+}
+
+export function isPrivateAddress(host: string): boolean {
+  const normalized = host.replace(/^\[|\]$/g, "").toLowerCase();
+  if (normalized === "localhost" || normalized.endsWith(".localhost")) return true;
+  const version = net.isIP(normalized);
+  if (version === 4) {
+    const [a = 0, b = 0] = normalized.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  }
+  if (version === 6) return normalized === "::1" || normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe80:");
+  return false;
 }
 
 function ruleMatches(rule: ScopeRule, target: URL): boolean {
   if (rule.scheme && `${rule.scheme}:` !== target.protocol) return false;
   if (!hostMatches(rule.host, target.hostname)) return false;
-
-  const targetPort = target.port
-    ? Number(target.port)
-    : target.protocol === "https:"
-      ? 443
-      : 80;
+  const targetPort = target.port ? Number(target.port) : target.protocol === "https:" ? 443 : 80;
   if (rule.port !== undefined && rule.port !== targetPort) return false;
-
   if (rule.pathPrefix) {
     const prefix = normalizePath(rule.pathPrefix);
-    const path = normalizePath(target.pathname);
-    if (!(path === prefix || path.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`))) {
-      return false;
-    }
+    const targetPath = normalizePath(target.pathname);
+    if (!(targetPath === prefix || targetPath.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`))) return false;
   }
-
   return true;
 }
 
@@ -55,50 +51,27 @@ export class ScopeEngine {
   public constructor(private readonly engagement: Engagement) {}
 
   public evaluate(targetValue: string, operation: OperationKind): ScopeDecision {
-    if (!this.engagement.authorizationConfirmed && operation !== "passive") {
-      return { allowed: false, reason: "engagement authorization is not confirmed" };
-    }
-
-    if (operation === "destructive") {
-      return { allowed: false, reason: "destructive operations require a separate approval gate" };
-    }
+    const deny = (reason: string, extra: Partial<ScopeDecision> = {}): ScopeDecision => ({ allowed: false, reason, operation, ...extra });
+    if (operation !== "passive" && !this.engagement.authorizationConfirmed) return deny("engagement authorization is not confirmed");
+    if (operation !== "passive" && this.engagement.mode === "observe") return deny("engagement is in observe mode");
+    if (operation === "high" && !this.engagement.allowHighRisk) return deny("high-risk operations are disabled for this engagement");
+    if (operation === "destructive" && !this.engagement.allowDestructive) return deny("destructive operations are disabled for this engagement");
 
     let target: URL;
-    try {
-      target = new URL(targetValue);
-    } catch {
-      return { allowed: false, reason: "target is not a valid absolute URL" };
-    }
-
-    if (target.protocol !== "http:" && target.protocol !== "https:") {
-      return { allowed: false, reason: "only HTTP and HTTPS targets are supported" };
-    }
+    try { target = new URL(targetValue); } catch { return deny("target is not a valid absolute URL"); }
+    if (!["http:", "https:"].includes(target.protocol)) return deny("only HTTP and HTTPS targets are supported");
+    if (target.username || target.password) return deny("targets containing URL credentials are not accepted");
 
     const normalizedTarget = `${target.protocol}//${target.host}${normalizePath(target.pathname)}${target.search}`;
-    const denied = this.engagement.deny.find((rule) => ruleMatches(rule, target));
-    if (denied) {
-      return {
-        allowed: false,
-        reason: "target matched an explicit deny rule",
-        normalizedTarget,
-        matchedRuleId: denied.id,
-      };
-    }
+    const deniedRule = this.engagement.deny.find((rule) => ruleMatches(rule, target));
+    if (deniedRule) return deny("target matched an explicit deny rule", { normalizedTarget, matchedRuleId: deniedRule.id });
+    const allowedRule = this.engagement.allow.find((rule) => ruleMatches(rule, target));
+    if (!allowedRule) return deny("target did not match an allow rule", { normalizedTarget });
+    if (isPrivateAddress(target.hostname) && !hostMatches(allowedRule.host, target.hostname)) return deny("private targets require an exact allow rule", { normalizedTarget });
+    return { allowed: true, reason: "target is inside the authorized engagement scope", normalizedTarget, matchedRuleId: allowedRule.id, operation };
+  }
 
-    const allowed = this.engagement.allow.find((rule) => ruleMatches(rule, target));
-    if (!allowed) {
-      return {
-        allowed: false,
-        reason: "target did not match an allow rule",
-        normalizedTarget,
-      };
-    }
-
-    return {
-      allowed: true,
-      reason: "target is inside the authorized engagement scope",
-      normalizedTarget,
-      matchedRuleId: allowed.id,
-    };
+  public evaluateMany(targets: string[], operation: OperationKind): ScopeDecision[] {
+    return [...new Set(targets)].map((target) => this.evaluate(target, operation));
   }
 }
