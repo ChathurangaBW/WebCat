@@ -1,0 +1,19 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import path from "node:path";
+import { McpClient } from "./client.js";
+
+test("stdio MCP initialize, list, and call", async () => {
+  const script = path.join(process.cwd(), "packages/mcp-gateway/dist/mock-mcp.js");
+  const client = new McpClient("mock", {
+    transport: "stdio",
+    command: process.execPath,
+    args: [script],
+    timeoutMs: 5000
+  });
+  const tools = await client.listTools();
+  assert.equal(tools[0]?.name, "get_history");
+  const result = await client.callTool("get_history", {}) as any;
+  assert.equal(result.content[0].type, "text");
+  await client.close();
+});

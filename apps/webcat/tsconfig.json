@@ -1,0 +1,1 @@
+{"extends":"../../tsconfig.base.json","compilerOptions":{"outDir":"dist","rootDir":"src","composite":true,"typeRoots":["../../types"]},"references":[{"path":"../../packages/core"},{"path":"../../packages/mcp-gateway"},{"path":"../../packages/agent-profiles"},{"path":"../../packages/agent-runtime"}],"include":["src/**/*.ts","../../types/**/*.d.ts"]}
