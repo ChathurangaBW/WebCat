@@ -1,10 +1,9 @@
 node_modules/
 dist/
+coverage/
 *.tsbuildinfo
-.webcat/
-.turbo/
-*.log
 .env
 .env.*
+.webcat/
 .DS_Store
-coverage/
+*.log
