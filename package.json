@@ -1,31 +1,29 @@
 {
   "name": "webcat",
   "version": "1.0.0",
-  "private": true,
   "description": "Terminal-native AI swarm for authorized web application security assessment",
   "license": "MIT",
   "type": "module",
   "bin": {
     "webcat": "bin/webcat.mjs"
   },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE",
+    "NOTICE.md",
+    "SECURITY.md",
+    ".webcat/*.example.json",
+    "docs/"
   ],
-  "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
-    "clean": "node scripts/clean.mjs",
-    "build": "tsc -b",
-    "typecheck": "tsc -b --pretty false",
-    "test": "tsc -b && node --test packages/*/dist/*.test.js apps/*/dist/*.test.js",
-    "start": "node apps/webcat/dist/main.js",
-    "dev": "tsc -b && node apps/webcat/dist/main.js tui",
-    "smoke": "tsc -b && node scripts/smoke.mjs"
-  },
-  "devDependencies": {
-    "typescript": "^5.8.3"
+    "test": "node --test test/*.test.mjs",
+    "smoke": "node test/e2e.mjs",
+    "start": "node bin/webcat.mjs",
+    "check": "npm test && npm run smoke"
   }
 }

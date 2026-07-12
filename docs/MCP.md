@@ -1,102 +1,65 @@
-# MCP Integration
+# MCP integration
 
-WebCat connects to MCP servers through stdio or streamable HTTP/SSE.
+WebCat supports MCP servers over:
 
-## Stdio server
+- stdio;
+- streamable HTTP;
+- HTTP responses encoded as server-sent events.
+
+## Configuration
 
 ```json
 {
+  "schemaVersion": 1,
   "servers": {
-    "proxy": {
+    "caido": {
       "transport": "stdio",
-      "command": "security-proxy-mcp",
+      "command": "caido-mcp",
       "args": ["serve"],
       "enabled": true,
-      "timeoutMs": 60000,
-      "env": {
-        "PROXY_URL": "http://127.0.0.1:8080",
-        "PROXY_TOKEN": "${PROXY_TOKEN}"
-      }
-    }
-  }
-}
-```
-
-## HTTP server
-
-```json
-{
-  "servers": {
-    "remote": {
+      "startupTimeoutMs": 15000,
+      "toolTimeoutMs": 60000,
+      "disabledTools": ["race_window_send"]
+    },
+    "custom": {
       "transport": "http",
       "url": "http://127.0.0.1:9000/mcp",
-      "enabled": true,
-      "headers": {
-        "Authorization": "Bearer ${WEBCAT_MCP_TOKEN}"
-      }
+      "bearerTokenEnvVar": "CUSTOM_MCP_TOKEN",
+      "enabled": true
     }
   }
 }
 ```
 
-## Capability normalization
+## Capability classification
 
-Agents request stable WebCat capabilities such as:
+Classification uses, in order:
 
-- `proxy.history.list`
-- `proxy.history.read`
-- `proxy.request.replay`
-- `proxy.request.batch`
-- `proxy.response.diff`
-- `sitemap.read`
+1. explicit `capabilityMap`;
+2. MCP tool annotations;
+3. conservative tool-name patterns;
+4. a default active/high classification.
+
+Unknown tools are not assumed passive.
+
+Useful capability classes include:
+
+- `proxy.read`
+- `data.read`
+- `scope.read`
+- `http.execute`
 - `browser.navigate`
-- `browser.inspect`
 - `scanner.run`
-- `workflow.run`
+- `concurrency.test`
+- `findings.write`
+- `proxy.control`
+- `workspace.admin`
+- `destructive.execute`
 
-Known tool names and read-only/destructive annotations are mapped automatically. An unknown active tool is not trusted by name heuristics alone.
+## Stdio requirements
 
-## Custom capability mappings
+MCP servers must emit JSON-RPC messages on stdout and diagnostics on stderr. Accidental stdout noise is ignored, but repeated protocol violations will cause timeouts.
 
-```json
-{
-  "servers": {
-    "custom": {
-      "transport": "stdio",
-      "command": "custom-mcp",
-      "enabled": true,
-      "capabilities": {
-        "custom_history": {
-          "name": "proxy.history.list",
-          "risk": "read",
-          "trusted": true
-        },
-        "custom_replay": {
-          "name": "proxy.request.replay",
-          "risk": "active",
-          "trusted": true
-        }
-      }
-    }
-  }
-}
-```
+## Output filtering
 
-Mappings can use the exact tool name or the normalized tool name. They are part of the trusted project configuration and should be reviewed like code.
-
-## Operational commands
-
-```bash
-webcat mcp list
-webcat mcp status
-webcat mcp tools
-webcat mcp tools proxy
-webcat mcp call proxy list_requests --args '{}'
-webcat mcp call proxy send_request --args '{"url":"https://app.example.test/api"}' --approve
-```
-
-The `--approve` option is a one-time operator approval. Stored approvals are preferable for bounded repeated work.
-
-## Out-of-scope output filtering
-
-Read-only history and sitemap tools may return records outside the engagement. When `filterOutOfScopeMcpOutput` is enabled, WebCat removes array records containing only out-of-scope URLs and replaces out-of-scope URLs embedded in strings with `[OUT_OF_SCOPE]` before model exposure and persistence.
+Passive tools may return records for multiple hosts. WebCat recursively removes records containing URLs or host/path pairs that fail current scope evaluation before evidence is persisted or returned to an agent.

@@ -1,87 +1,43 @@
 # Operations
 
-## Engagement lifecycle
+## Recommended workflow
 
-```text
-NEW
- -> AUTHORIZATION_REQUIRED or SCOPE_READY
- -> MCP_DISCOVERY
- -> PASSIVE_MAPPING
- -> ATTACK_SURFACE_READY
- -> HYPOTHESIS_GENERATION
- -> ACTIVE_VALIDATION when candidates exist
- -> FINDING_REVIEW
- -> REPORT_READY
- -> COMPLETED
-```
-
-A session may also enter `PAUSED`, `BLOCKED`, or `FAILED`.
-
-## Project startup
-
-```bash
-webcat init
-webcat doctor
-webcat scope-check https://app.example.test/api --operation passive
-webcat mcp status
-```
-
-Confirm the authorization reference and change the engagement mode only after the scope is correct.
+1. Run `webcat init`.
+2. Replace all authorization placeholders.
+3. Add exact allow and deny rules.
+4. Start in `observe` mode.
+5. Configure and enable one MCP server.
+6. Run `webcat doctor`.
+7. Run `webcat mcp status --connect`.
+8. Use passive mapping objectives.
+9. Review hypotheses and evidence.
+10. Change to `manual` only when bounded active validation is authorized.
+11. Grant short-lived, narrowly scoped approvals.
+12. Verify evidence and audit integrity before reporting.
 
 ## Approvals
+
+Prefer the narrowest approval:
 
 ```bash
 webcat approvals grant \
   --risk active \
-  --ttl 20m \
-  --reason "Controlled object authorization comparison" \
-  --server proxy \
+  --ttl 10m \
+  --capability http.execute \
+  --server caido \
   --tool send_request \
-  --target 'https://app.example.test/api/*'
-
-webcat approvals list
-webcat approvals revoke apr_example
+  --reason "Validate object authorization using two test accounts"
 ```
 
-Approvals can be restricted by risk, MCP server, tool, and wildcard target pattern. They expire automatically and are evaluated at call time.
+Revoke it immediately after the validation step.
 
-## Persistent data
+## Incident response
 
-```text
-.webcat/
-  config.toml
-  engagement.yaml
-  mcp.json
-  audit.jsonl
-  approvals.jsonl
-  findings.jsonl
-  hypotheses.jsonl
-  state/
-  evidence/
-  reports/
-```
+If an operation appears out of scope:
 
-Evidence payloads are stored separately from the evidence index. Audit records form a SHA-256 hash chain.
-
-## Review workflow
-
-```bash
-webcat hypotheses list
-webcat findings list
-webcat findings show find_example
-webcat evidence show ev_example
-webcat audit verify
-webcat report --format markdown
-```
-
-Only findings with `validated` status appear as confirmed findings in the Markdown report.
-
-## Recovery
-
-```bash
-webcat sessions list
-webcat sessions show session_example
-webcat resume session_example
-```
-
-A resumed run reuses the existing session record and objective while creating new isolated agent conversations.
+1. stop the MCP server;
+2. switch the engagement to `observe`;
+3. revoke active approvals;
+4. preserve `.webcat/audit.jsonl`;
+5. run `webcat audit verify`;
+6. inspect redacted evidence and the relevant authorization rules.

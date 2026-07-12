@@ -1,16 +1,13 @@
-# WebCat 1.0.0
+# Release checklist
 
-WebCat 1.0.0 is the first complete CLI/TUI release of the independent WebCat codebase.
-
-Included:
-
-- terminal command and interactive workspace;
-- authorization and scope configuration;
-- persistent sessions and resume;
-- generic stdio and HTTP/SSE MCP integration;
-- capability normalization and custom mappings;
-- code-level scope, risk, approval, rate, and concurrency enforcement;
-- out-of-scope MCP output filtering;
-- configurable model-backed specialist swarm;
-- hypotheses, redacted evidence, hash-chained audit, findings, validation, critic review, and reports;
-- unit, transport, model, swarm, and CLI smoke tests.
+- [ ] authorization and scope tests pass
+- [ ] packaged CLI tests pass
+- [ ] mock end-to-end swarm run passes
+- [ ] evidence integrity verification passes
+- [ ] concurrent audit-chain verification passes
+- [ ] `npm test`
+- [ ] `npm run smoke`
+- [ ] `npm pack --dry-run`
+- [ ] README command examples match CLI help
+- [ ] version updated in `package.json`, the CLI, and MCP client metadata
+- [ ] third-party notices reviewed

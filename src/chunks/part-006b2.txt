@@ -1,0 +1,83 @@
+n await skillsCommand(rest, cwd);
+    case "mcp":
+      return await mcpCommand(rest, cwd);
+    case "approvals":
+      return await approvalsCommand(rest, cwd);
+    case "run":
+      return await runCommand(rest, cwd);
+    case "resume":
+      return await resumeCommand(rest, cwd);
+    case "hypotheses":
+      return await listStoreCommand("hypotheses", rest, cwd);
+    case "findings":
+      return await listStoreCommand("findings", rest, cwd);
+    case "evidence":
+      return await evidenceCommand(rest, cwd);
+    case "audit":
+      return await auditCommand(rest, cwd);
+    case "report":
+      return await reportCommand(rest, cwd);
+    case "tui":
+      await startTui(cwd);
+      return 0;
+    default:
+      throw new Error(`Unknown command "${command}". Run "webcat help".`);
+  }
+}
+async function initCommand(args, cwd) {
+  const written = await initializeProject(cwd, args.includes("--force"));
+  if (written.length === 0) console.log("WebCat project already initialized. Use --force to replace templates.");
+  else {
+    console.log("Initialized WebCat:");
+    for (const path of written) console.log(`  ${path}`);
+    console.log("\nEdit .webcat/engagement.json before running external operations.");
+  }
+  return 0;
+}
+async function doctorCommand(args, cwd) {
+  const checks = [];
+  const paths = projectPaths(cwd);
+  let engagement;
+  let config;
+  try {
+    engagement = await loadEngagement(cwd);
+    checks.push({ check: "engagement", ok: true, detail: paths.engagement });
+    try {
+      assertAuthorizationCurrent(engagement);
+      checks.push({ check: "authorization-window", ok: true, detail: `${engagement.startsAt} \u2014 ${engagement.expiresAt}` });
+    } catch (error) {
+      checks.push({ check: "authorization-window", ok: false, detail: error.message });
+    }
+  } catch (error) {
+    checks.push({ check: "engagement", ok: false, detail: error.message });
+  }
+  try {
+    config = await loadConfig(cwd);
+    checks.push({ check: "config", ok: true, detail: paths.config });
+    const apiKeyReady = config.model.provider === "mock" || Boolean(process.env[config.model.apiKeyEnv]);
+    checks.push({ check: "model-credentials", ok: apiKeyReady, detail: config.model.provider === "mock" ? "Mock provider" : config.model.apiKeyEnv });
+  } catch (error) {
+    checks.push({ check: "config", ok: false, detail: error.message });
+  }
+  try {
+    const manager = await McpManager.load(paths.mcp);
+    checks.push({ check: "mcp-config", ok: true, detail: `${Object.keys(manager.config.servers).length} server(s)` });
+  } catch (error) {
+    checks.push({ check: "mcp-config", ok: false, detail: error.message });
+  }
+  try {
+    const runtime = engagement && config ? await createRuntime(cwd) : void 0;
+    const audit = runtime ? await runtime.audit.verify() : { valid: true, records: 0 };
+    checks.push({ check: "audit-chain", ok: audit.valid, detail: `${audit.records} record(s)${audit.error ? `: ${audit.error}` : ""}` });
+    await runtime?.manager.close();
+  } catch (error) {
+    checks.push({ check: "runtime", ok: false, detail: error.message });
+  }
+  if (args.includes("--json")) printJson(checks);
+  else printTable(checks);
+  return checks.every((check) => check.ok) ? 0 : 1;
+}
+async function scopeCheckCommand(args, cwd) {
+  const target = args.find((arg) => !arg.startsWith("-"));
+  if (!target) throw new Error("Usage: webcat scope-check <url> --operation passive|active|high|destructive");
+  const operation = option(args, "--operation") ?? "passive";

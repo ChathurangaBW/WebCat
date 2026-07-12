@@ -1,14 +1,32 @@
-# Security Policy
+# Security policy
 
-WebCat is for explicitly authorized security assessments only.
+## Intended use
 
-External operations are deny-by-default and must pass:
+WebCat is intended only for web applications and APIs covered by explicit, current authorization. Do not use it against public targets, third-party infrastructure, or data outside the written engagement scope.
 
-1. written authorization confirmation;
-2. exact engagement scope evaluation;
-3. trusted MCP capability classification;
-4. engagement risk policy;
-5. operator approval when required;
-6. request-rate and parallelism limits.
+## Reporting a vulnerability in WebCat
 
-Destructive operations are disabled unless both the engagement policy and an explicit operator approval permit them. Secrets are redacted before audit and evidence persistence. Do not commit API keys, session cookies, authorization headers, private evidence, or production engagement data.
+Do not disclose a WebCat vulnerability in a public issue if it could expose credentials, bypass scope controls, corrupt evidence, or permit unintended external actions. Contact the repository owner privately through GitHub first.
+
+Include:
+
+- affected commit or version;
+- reproduction steps;
+- expected and actual policy behavior;
+- whether the issue can bypass scope, approvals, redaction, or audit integrity;
+- a minimal patch or mitigation when available.
+
+## Security invariants
+
+Changes must preserve these invariants:
+
+- no active external call without a concrete target;
+- deny rules override allow rules;
+- wildcard hosts do not match sibling or lookalike domains;
+- expired or placeholder authorization blocks execution;
+- model output cannot bypass the gateway;
+- untrusted MCP output is never inserted as system instructions;
+- evidence redaction occurs before persistence;
+- candidates are not promoted without validation;
+- destructive operations remain disabled unless explicitly enabled and approved;
+- audit-chain verification detects mutation.

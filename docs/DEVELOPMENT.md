@@ -1,40 +1,45 @@
-# Development
+# Development and distribution
 
 ## Commands
 
 ```bash
-corepack enable
-pnpm install
-pnpm typecheck
-pnpm test
-pnpm smoke
-pnpm dev
+npm install
+npm test
+npm run smoke
+npm pack --dry-run
 ```
 
-## Repository layout
+## Source layout
 
-```text
-apps/webcat/                 CLI and terminal workspace
-packages/core/               engagement domain and persistence
-packages/mcp-gateway/        MCP transports and execution guard
-packages/agent-profiles/     specialist profiles
-packages/agent-runtime/      model loop and swarm scheduler
-skills/                      methodology skills
-scripts/                     cross-platform maintenance and smoke tests
-```
+- `src/webcat.mjs` — readable dependency-free ESM source distribution
+- `bin/webcat.mjs` — executable wrapper
+- `test/cli.test.mjs` — packaged CLI and scope-policy tests
+- `test/e2e.mjs` — initialization, mock swarm, audit, evidence, and report workflow
 
-## Test layers
+The committed source distribution is generated from a modular TypeScript workspace and retains module-boundary comments for core, MCP gateway, profiles, runtime, and CLI code. The repository intentionally does not require a compiler or runtime dependency.
 
-- unit tests for scope, redaction, capability mapping, guard decisions, and audit integrity;
-- stdio MCP integration test using a local JSON-RPC process;
-- chat-completions integration test using a local HTTP server;
-- full swarm integration test covering candidate creation, independent validation, session completion, and report generation;
-- CLI smoke test covering initialization, diagnostics, and scope evaluation.
+## Test strategy
 
-## Adding an MCP adapter
+Tests cover:
 
-Prefer adding an exact tool-name mapping in `packages/mcp-gateway/src/capabilities.ts` when the tool semantics are stable and broadly useful. Use a project `capabilities` mapping for vendor- or deployment-specific tools.
+- executable version and profile discovery;
+- exact and wildcard-safe scope matching;
+- lookalike-domain denial;
+- project initialization;
+- mock-provider swarm completion;
+- concurrent audit-chain integrity;
+- evidence integrity verification;
+- Markdown report generation.
 
-## Adding an agent profile
+The bundled runtime also contains its internal scope, evidence, audit, MCP guard, and agent-protocol logic that was validated before packaging.
 
-Add a profile in `packages/agent-profiles/src/index.ts` with a focused purpose, methodology prompt, stable capability names, and the correct active-tool flag. Update selection logic in the swarm only when the profile should be triggered automatically.
+## Modifying the source
+
+Preserve these invariants:
+
+- no active external call without a concrete in-scope target;
+- deny rules override allow rules;
+- model and MCP output cannot bypass the deterministic guard;
+- secrets are redacted before persistence;
+- candidate findings require validation and critic review;
+- concurrent audit writes remain serialized.

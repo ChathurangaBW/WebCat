@@ -1,36 +1,43 @@
 {
+  "schemaVersion": 1,
   "servers": {
     "caido": {
       "transport": "stdio",
-      "command": "caido-mcp-server",
-      "args": ["serve"],
+      "command": "caido-mcp",
+      "args": [
+        "serve"
+      ],
       "enabled": false,
-      "timeoutMs": 60000,
-      "env": {
-        "CAIDO_URL": "http://127.0.0.1:8080",
-        "CAIDO_PAT": "${CAIDO_PAT}"
-      }
-    },
-    "generic-http": {
-      "transport": "http",
-      "url": "http://127.0.0.1:9000/mcp",
-      "enabled": false,
-      "timeoutMs": 60000,
-      "headers": {
-        "Authorization": "Bearer ${WEBCAT_MCP_TOKEN}"
-      },
-      "capabilities": {
-        "custom_history": {
-          "name": "proxy.history.list",
-          "risk": "read",
-          "trusted": true
+      "disabledTools": [
+        "race_window_send"
+      ],
+      "capabilityMap": {
+        "list_requests": {
+          "capability": "proxy.read",
+          "risk": "passive",
+          "requiresTarget": false
         },
-        "custom_replay": {
-          "name": "proxy.request.replay",
+        "get_request": {
+          "capability": "proxy.read",
+          "risk": "passive",
+          "requiresTarget": false
+        },
+        "send_request": {
+          "capability": "http.execute",
           "risk": "active",
-          "trusted": true
+          "requiresTarget": true
+        },
+        "run_workflow": {
+          "capability": "scanner.run",
+          "risk": "high",
+          "requiresTarget": true
         }
       }
+    },
+    "burp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:9876/mcp",
+      "enabled": false
     }
   }
 }
