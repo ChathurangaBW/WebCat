@@ -23,7 +23,9 @@
     "test": "tsc -b && node --test packages/*/dist/*.test.js apps/*/dist/*.test.js",
     "start": "node apps/webcat/dist/main.js",
     "dev": "tsc -b && node apps/webcat/dist/main.js tui",
-    "smoke": "tsc -b && node scripts/smoke.mjs"
+    "smoke": "tsc -b && node scripts/smoke.mjs",
+    "verify:branding": "node scripts/verify-webcat-branding.mjs",
+    "qa": "pnpm verify:branding && pnpm typecheck && pnpm test && pnpm smoke && pnpm verify:branding"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
