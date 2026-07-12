@@ -1,9 +1,6 @@
+.webcat/
 node_modules/
-dist/
-coverage/
-*.tsbuildinfo
 .env
 .env.*
-.webcat/
-.DS_Store
 *.log
+.DS_Store
