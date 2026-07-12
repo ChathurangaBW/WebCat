@@ -1,95 +1,51 @@
-# WebCat Architecture
+# Architecture
 
-## System shape
+## Design goals
 
-```text
-┌────────────────────────────────────────────────────────────┐
-│ WebCat CLI and interactive terminal workspace              │
-│ init • doctor • run • resume • findings • report • audit  │
-└────────────────────────────┬───────────────────────────────┘
-                             │
-┌────────────────────────────▼───────────────────────────────┐
-│ Session and workflow runtime                               │
-│ lifecycle • persistence • cancellation • retries          │
-└────────────────────────────┬───────────────────────────────┘
-                             │
-┌────────────────────────────▼───────────────────────────────┐
-│ Swarm orchestrator                                         │
-│ planning • lane selection • bounded concurrency • review  │
-└───────────────┬──────────────────────┬─────────────────────┘
-                │                      │
-       ┌────────▼────────┐    ┌────────▼────────┐
-       │ Specialist      │    │ Validator and   │
-       │ agents          │    │ critic agents   │
-       └────────┬────────┘    └────────┬────────┘
-                └──────────────┬───────┘
-                               │
-┌──────────────────────────────▼─────────────────────────────┐
-│ MCP capability gateway                                    │
-│ discover -> classify -> scope -> approve -> limit -> call │
-│          -> filter out-of-scope output -> persist         │
-└──────────────────────────────┬─────────────────────────────┘
-                               │
-┌──────────────────────────────▼─────────────────────────────┐
-│ External MCP servers                                      │
-│ proxy • browser • scanner • sitemap • custom tools        │
-└──────────────────────────────┬─────────────────────────────┘
-                               │
-┌──────────────────────────────▼─────────────────────────────┐
-│ Engagement records                                        │
-│ audit • evidence • hypotheses • findings • reports        │
-└────────────────────────────────────────────────────────────┘
-```
+WebCat separates probabilistic agent reasoning from deterministic execution policy. Agents can propose actions, but only the MCP gateway can execute them.
 
 ## Packages
 
-### `@webcat/core`
+- `@webcat/core` — engagement schema, scope engine, approvals, evidence, audit, sessions, hypotheses, findings, skills, and reports.
+- `@webcat/mcp-gateway` — generic MCP transports, discovery, classification, target extraction, guard pipeline, filtering, and rate limits.
+- `@webcat/agent-profiles` — specialist contribution catalog and objective-based selection.
+- `@webcat/agent-runtime` — model provider, JSON action protocol, isolated agent loop, bounded swarm, validation, and critic gates.
+- `@webcat/cli` — operator commands, diagnostics, initialization, reporting, and TUI.
 
-Owns configuration, engagement parsing, scope rules, approvals, redaction, audit-chain persistence, evidence, hypotheses, findings, workflow state, skills, and reports.
+## Session state machine
 
-### `@webcat/mcp-gateway`
+```text
+NEW
+ -> AUTHORIZATION_REQUIRED | SCOPE_READY
+ -> MCP_DISCOVERY
+ -> PASSIVE_MAPPING
+ -> ATTACK_SURFACE_READY
+ -> HYPOTHESIS_GENERATION
+ -> ACTIVE_VALIDATION (when permitted and needed)
+ -> FINDING_REVIEW
+ -> REPORT_READY
+ -> COMPLETED
+```
 
-Owns MCP stdio and HTTP/SSE transports, initialization, tool discovery, capability mapping, scope and approval enforcement, rate limiting, response filtering, and evidence capture.
-
-### `@webcat/agent-profiles`
-
-Defines the WebCat orchestrator, passive mapping agents, vulnerability-domain specialists, independent validator, security critic, evidence curator, and report writer.
-
-### `@webcat/agent-runtime`
-
-Owns the chat-completions client, isolated agent conversations, internal evidence/finding tools, MCP tool exposure, bounded scheduling, retries, validation, critic review, and session completion.
-
-### `@webcat/cli`
-
-Provides the `webcat` command, project initialization, diagnostics, operational commands, and interactive terminal workspace.
-
-## External-call enforcement
-
-Every MCP call follows this fixed path:
-
-1. resolve the tool to a WebCat capability;
-2. classify it as read, active, high, or destructive;
-3. reject untrusted active heuristics unless a custom mapping exists;
-4. extract absolute target URLs from arguments;
-5. enforce authorization, engagement mode, allow rules, deny rules, and risk policy;
-6. resolve one-time or stored operator approval;
-7. acquire request-rate and concurrency capacity;
-8. execute the MCP request;
-9. filter returned records and URLs against passive scope;
-10. redact secrets and persist request, response, and audit evidence.
-
-This enforcement is code-level. Agent prompts and skills provide methodology but are not security boundaries.
+`PAUSED`, `BLOCKED`, and `FAILED` preserve resumable state.
 
 ## Agent isolation
 
-Each specialist receives an independent message history, task, profile prompt, and capability-filtered MCP tool set. Results are returned to the orchestrator through stored evidence, hypotheses, findings, and final summaries rather than shared mutable model context.
+Each profile receives:
+
+- its own system prompt;
+- the engagement summary, not raw secrets;
+- only MCP tools whose classified capability appears in that profile's allowlist;
+- an independent conversation transcript;
+- untrusted MCP output inside explicit data delimiters.
+
+The parent runtime receives only the final handoff and evidence identifiers.
 
 ## Finding lifecycle
 
 ```text
-observation -> hypothesis -> controlled test -> evidence
-           -> candidate -> independent validator
-           -> critic for high/critical -> validated report item
+observation -> hypothesis -> candidate finding -> validator -> critic
+                                               -> validated/rejected
 ```
 
-A specialist cannot directly create a validated finding. Only validator or critic profiles receive the status-transition tool.
+A specialist cannot directly create a confirmed finding. Validator and critic outputs are matched to stored candidates, and the deterministic runtime applies status changes.

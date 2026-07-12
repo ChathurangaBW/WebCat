@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "model": {
+    "provider": "openai-compatible",
+    "baseUrl": "https://api.openai.com/v1",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "model": "gpt-4.1-mini",
+    "timeoutMs": 120000
+  },
+  "swarm": {
+    "maxConcurrency": 3,
+    "maxAgentTurns": 6,
+    "maxToolCallsPerAgent": 8
+  },
+  "evidence": {
+    "maxBodyBytes": 262144,
+    "redactHeaders": [
+      "authorization",
+      "proxy-authorization",
+      "cookie",
+      "set-cookie",
+      "x-api-key"
+    ],
+    "redactKeys": [
+      "password",
+      "secret",
+      "token",
+      "access_token",
+      "refresh_token",
+      "api_key"
+    ]
+  }
+}

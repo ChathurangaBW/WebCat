@@ -1,28 +1,42 @@
-# Security Model
+# Security model
 
 ## Trust boundaries
 
-WebCat treats model output, MCP tool metadata, MCP responses, captured traffic, and skill text as untrusted input. Project configuration and operator approvals are privileged inputs.
+Trusted deterministic components:
 
-## Enforced controls
+- local engagement configuration;
+- scope engine;
+- approval store;
+- MCP guard;
+- evidence redaction;
+- audit hashing;
+- session state transitions.
 
-- active operations require confirmed authorization;
-- observe mode blocks active, high, and destructive operations;
-- deny rules take precedence over allow rules;
-- unknown active MCP capabilities require an explicit trusted mapping;
-- active calls require absolute target URLs in arguments;
-- manual mode requires operator approval for active calls;
-- high and destructive operations require engagement policy and approval;
-- request rate and parallelism are bounded;
-- out-of-scope MCP records are filtered before model exposure;
-- common credentials are redacted before persistence;
-- evidence is hashed and audit records are hash chained;
-- only validator and critic profiles can change finding validation status.
+Untrusted components:
 
-## Non-goals
+- model output;
+- MCP server descriptions and results;
+- target application content;
+- proxy history;
+- browser-rendered content;
+- third-party skills.
 
-WebCat cannot prove that an external MCP server faithfully applies its own controls. It cannot prevent an authorized external tool from performing behavior that is hidden behind a misleading tool implementation. Use only MCP servers you trust and review custom capability mappings.
+## Threats addressed
 
-## Sensitive data
+- model requests an out-of-scope target;
+- MCP tool name understates its impact;
+- wildcard domain matches a lookalike host;
+- passive proxy history leaks unrelated hosts;
+- expired authorization continues to run;
+- prompt injection appears in target content;
+- secrets are persisted in evidence;
+- a candidate claim is reported as confirmed;
+- audit records are modified.
 
-Do not commit `.webcat` engagement state. Keep authentication tokens in environment variables. Leave upstream proxy-side sensitive-header redaction enabled unless the engagement explicitly requires otherwise.
+## Limitations
+
+- WebCat cannot prove the legal sufficiency of an authorization document.
+- Custom MCP servers can misrepresent behavior. Use explicit capability mappings and local isolation.
+- Output filtering is a defense-in-depth control, not a replacement for configuring proxy scope.
+- The JSON action protocol depends on the configured model following instructions; malformed output stops the agent rather than being guessed.
+- Legacy SSE servers that require a separate GET endpoint and message endpoint may need a streamable HTTP bridge.

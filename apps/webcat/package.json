@@ -1,1 +1,0 @@
-{"name":"@webcat/cli","version":"1.0.0","private":true,"type":"module","bin":{"webcat":"dist/main.js"},"exports":"./dist/main.js","scripts":{"build":"tsc -p tsconfig.json"},"dependencies":{"@webcat/core":"workspace:*","@webcat/mcp-gateway":"workspace:*","@webcat/agent-profiles":"workspace:*","@webcat/agent-runtime":"workspace:*"}}

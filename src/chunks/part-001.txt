@@ -1,0 +1,380 @@
+Time();
+      }
+    };
+    riskRank = { passive: 0, active: 1, high: 2, destructive: 3 };
+  }
+});
+
+// packages/core/dist/audit.js
+import { readFile as readFile3 } from "node:fs/promises";
+var GENESIS, AuditLog;
+var init_audit = __esm({
+  "packages/core/dist/audit.js"() {
+    "use strict";
+    init_utils();
+    GENESIS = "0".repeat(64);
+    AuditLog = class {
+      path;
+      queue = Promise.resolve();
+      constructor(path) {
+        this.path = path;
+      }
+      append(event, actor, data, options = {}) {
+        const operation = this.queue.then(async () => {
+          const records = await this.read();
+          const previousHash = records.at(-1)?.hash ?? GENESIS;
+          const unsigned = {
+            sequence: records.length + 1,
+            timestamp: now(),
+            event,
+            actor,
+            ...options.sessionId ? { sessionId: options.sessionId } : {},
+            data,
+            previousHash
+          };
+          const record = { ...unsigned, hash: sha256(stableStringify(unsigned)) };
+          await appendJsonLine(this.path, record);
+          return record;
+        });
+        this.queue = operation.then(() => void 0, () => void 0);
+        return operation;
+      }
+      async read() {
+        try {
+          const content = await readFile3(this.path, "utf8");
+          return content.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+        } catch (error) {
+          if (error.code === "ENOENT")
+            return [];
+          throw error;
+        }
+      }
+      async verify() {
+        await this.queue;
+        const records = await this.read();
+        let previousHash = GENESIS;
+        for (let index = 0; index < records.length; index += 1) {
+          const record = records[index];
+          if (record.sequence !== index + 1)
+            return { valid: false, records: records.length, error: `Sequence mismatch at record ${index + 1}.` };
+          if (record.previousHash !== previousHash)
+            return { valid: false, records: records.length, error: `Chain mismatch at record ${index + 1}.` };
+          const { hash, ...unsigned } = record;
+          if (sha256(stableStringify(unsigned)) !== hash)
+            return { valid: false, records: records.length, error: `Hash mismatch at record ${index + 1}.` };
+          previousHash = hash;
+        }
+        return { valid: true, records: records.length };
+      }
+    };
+  }
+});
+
+// packages/core/dist/evidence.js
+import { mkdir as mkdir2, readFile as readFile4, readdir, writeFile as writeFile2 } from "node:fs/promises";
+import { resolve as resolve2 } from "node:path";
+function redact(value, config, key = "") {
+  const normalizedKey = key.toLowerCase();
+  if (config.redactKeys.some((candidate) => normalizedKey === candidate.toLowerCase()) || config.redactHeaders.some((candidate) => normalizedKey === candidate.toLowerCase())) {
+    return REDACTED;
+  }
+  if (typeof value === "string") {
+    return value.replace(/(authorization:\s*)([^\r\n]+)/gi, `$1${REDACTED}`).replace(/(cookie:\s*)([^\r\n]+)/gi, `$1${REDACTED}`).replace(/(set-cookie:\s*)([^\r\n]+)/gi, `$1${REDACTED}`).replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password)=)([^&\s]+)/gi, `$1${REDACTED}`);
+  }
+  if (Array.isArray(value))
+    return value.map((item) => redact(item, config));
+  if (isRecord(value)) {
+    return Object.fromEntries(Object.entries(value).map(([entryKey, item]) => [entryKey, redact(item, config, entryKey)]));
+  }
+  return value;
+}
+function truncate(value, maxBytes) {
+  const serialized = JSON.stringify(value);
+  if (Buffer.byteLength(serialized) <= maxBytes)
+    return { value, truncated: false };
+  const responseText = JSON.stringify(value.response);
+  const budget = Math.max(256, maxBytes - Buffer.byteLength(JSON.stringify(value.request ?? null)) - 128);
+  return {
+    value: {
+      ...value.request !== void 0 ? { request: value.request } : {},
+      response: `${responseText.slice(0, budget)}\u2026[TRUNCATED]`
+    },
+    truncated: true
+  };
+}
+var REDACTED, EvidenceStore;
+var init_evidence = __esm({
+  "packages/core/dist/evidence.js"() {
+    "use strict";
+    init_utils();
+    REDACTED = "[REDACTED]";
+    EvidenceStore = class {
+      directory;
+      config;
+      constructor(directory, config) {
+        this.directory = directory;
+        this.config = config;
+      }
+      async capture(input2) {
+        await mkdir2(this.directory, { recursive: true });
+        const sanitizedRequest = input2.request === void 0 ? void 0 : redact(input2.request, this.config);
+        const sanitizedResponse = input2.response === void 0 ? void 0 : redact(input2.response, this.config);
+        const limited = truncate({
+          request: sanitizedRequest,
+          response: sanitizedResponse
+        }, this.config.maxBodyBytes);
+        const unsigned = {
+          id: id("evidence"),
+          sessionId: input2.sessionId,
+          createdAt: now(),
+          kind: input2.kind,
+          source: input2.source,
+          ...input2.target ? { target: input2.target } : {},
+          ...limited.value.request !== void 0 ? { request: limited.value.request } : {},
+          ...limited.value.response !== void 0 ? { response: limited.value.response } : {},
+          truncated: limited.truncated
+        };
+        const record = { ...unsigned, sha256: sha256(stableStringify(unsigned)) };
+        await writeFile2(resolve2(this.directory, `${record.id}.json`), `${JSON.stringify(record, null, 2)}
+`, "utf8");
+        return record;
+      }
+      async list(sessionId) {
+        try {
+          const names = (await readdir(this.directory)).filter((name) => name.endsWith(".json"));
+          const records = await Promise.all(names.map(async (name) => JSON.parse(await readFile4(resolve2(this.directory, name), "utf8"))));
+          return records.filter((record) => !sessionId || record.sessionId === sessionId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+        } catch (error) {
+          if (error.code === "ENOENT")
+            return [];
+          throw error;
+        }
+      }
+      async verify() {
+        const records = await this.list();
+        const invalidIds = [];
+        for (const record of records) {
+          const { sha256: digest, ...unsigned } = record;
+          if (sha256(stableStringify(unsigned)) !== digest)
+            invalidIds.push(record.id);
+        }
+        return { valid: invalidIds.length === 0, checked: records.length, invalidIds };
+      }
+    };
+  }
+});
+
+// packages/core/dist/session.js
+import { mkdir as mkdir3, readFile as readFile5, readdir as readdir2, writeFile as writeFile3 } from "node:fs/promises";
+import { resolve as resolve3 } from "node:path";
+var transitions, SessionStore;
+var init_session = __esm({
+  "packages/core/dist/session.js"() {
+    "use strict";
+    init_utils();
+    transitions = {
+      NEW: ["AUTHORIZATION_REQUIRED", "SCOPE_READY", "FAILED"],
+      AUTHORIZATION_REQUIRED: ["SCOPE_READY", "BLOCKED", "FAILED"],
+      SCOPE_READY: ["MCP_DISCOVERY", "PAUSED", "FAILED"],
+      MCP_DISCOVERY: ["PASSIVE_MAPPING", "BLOCKED", "PAUSED", "FAILED"],
+      PASSIVE_MAPPING: ["ATTACK_SURFACE_READY", "PAUSED", "FAILED"],
+      ATTACK_SURFACE_READY: ["HYPOTHESIS_GENERATION", "PAUSED", "FAILED"],
+      HYPOTHESIS_GENERATION: ["ACTIVE_VALIDATION", "FINDING_REVIEW", "PAUSED", "FAILED"],
+      ACTIVE_VALIDATION: ["FINDING_REVIEW", "PAUSED", "BLOCKED", "FAILED"],
+      FINDING_REVIEW: ["REPORT_READY", "PAUSED", "FAILED"],
+      REPORT_READY: ["COMPLETED", "PAUSED", "FAILED"],
+      COMPLETED: [],
+      PAUSED: ["MCP_DISCOVERY", "PASSIVE_MAPPING", "HYPOTHESIS_GENERATION", "ACTIVE_VALIDATION", "FINDING_REVIEW", "REPORT_READY", "FAILED"],
+      BLOCKED: ["PAUSED", "FAILED"],
+      FAILED: ["PAUSED"]
+    };
+    SessionStore = class {
+      directory;
+      constructor(directory) {
+        this.directory = directory;
+      }
+      async create(engagementId, objective, selectedProfiles) {
+        const timestamp = now();
+        const session = {
+          id: id("session"),
+          engagementId,
+          objective,
+          state: "NEW",
+          selectedProfiles,
+          startedAt: timestamp,
+          updatedAt: timestamp
+        };
+        await this.write(session);
+        return session;
+      }
+      async get(sessionId) {
+        return JSON.parse(await readFile5(resolve3(this.directory, `${sessionId}.json`), "utf8"));
+      }
+      async list() {
+        try {
+          const files = (await readdir2(this.directory)).filter((name) => name.endsWith(".json"));
+          return (await Promise.all(files.map(async (name) => JSON.parse(await readFile5(resolve3(this.directory, name), "utf8"))))).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        } catch (error) {
+          if (error.code === "ENOENT")
+            return [];
+          throw error;
+        }
+      }
+      async latest() {
+        return (await this.list())[0];
+      }
+      async transition(session, next, patch = {}) {
+        if (session.state !== next && !transitions[session.state].includes(next)) {
+          throw new Error(`Invalid session transition ${session.state} -> ${next}.`);
+        }
+        const updated = {
+          ...session,
+          ...patch,
+          state: next,
+          updatedAt: now(),
+          ...next === "COMPLETED" ? { completedAt: now() } : {}
+        };
+        await this.write(updated);
+        return updated;
+      }
+      async write(session) {
+        await mkdir3(this.directory, { recursive: true });
+        await writeFile3(resolve3(this.directory, `${session.id}.json`), `${JSON.stringify(session, null, 2)}
+`, "utf8");
+      }
+    };
+  }
+});
+
+// packages/core/dist/store.js
+var HypothesisStore, FindingStore;
+var init_store = __esm({
+  "packages/core/dist/store.js"() {
+    "use strict";
+    init_utils();
+    HypothesisStore = class {
+      path;
+      constructor(path) {
+        this.path = path;
+      }
+      async list(sessionId) {
+        const items = await readJson(this.path, []);
+        return sessionId ? items.filter((item) => item.sessionId === sessionId) : items;
+      }
+      async add(sessionId, input2) {
+        const timestamp = now();
+        const item = {
+          ...input2,
+          id: id("hyp"),
+          sessionId,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        };
+        const items = await readJson(this.path, []);
+        items.push(item);
+        await writeJson(this.path, items);
+        return item;
+      }
+      async update(item) {
+        const items = await readJson(this.path, []);
+        const index = items.findIndex((candidate) => candidate.id === item.id);
+        if (index < 0)
+          throw new Error(`Hypothesis ${item.id} not found.`);
+        items[index] = { ...item, updatedAt: now() };
+        await writeJson(this.path, items);
+      }
+    };
+    FindingStore = class {
+      path;
+      constructor(path) {
+        this.path = path;
+      }
+      async list(sessionId) {
+        const items = await readJson(this.path, []);
+        return sessionId ? items.filter((item) => item.sessionId === sessionId) : items;
+      }
+      async add(sessionId, input2) {
+        const timestamp = now();
+        const item = {
+          ...input2,
+          id: id("finding"),
+          sessionId,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        };
+        const items = await readJson(this.path, []);
+        items.push(item);
+        await writeJson(this.path, items);
+        return item;
+      }
+      async update(item) {
+        const items = await readJson(this.path, []);
+        const index = items.findIndex((candidate) => candidate.id === item.id);
+        if (index < 0)
+          throw new Error(`Finding ${item.id} not found.`);
+        items[index] = { ...item, updatedAt: now() };
+        await writeJson(this.path, items);
+      }
+    };
+  }
+});
+
+// packages/core/dist/skills.js
+import { readdir as readdir3, readFile as readFile6 } from "node:fs/promises";
+import { homedir } from "node:os";
+import { basename, resolve as resolve4 } from "node:path";
+async function scan(directory) {
+  try {
+    const entries = await readdir3(directory, { withFileTypes: true });
+    const skills = [];
+    for (const entry of entries) {
+      const candidate = entry.isDirectory() ? resolve4(directory, entry.name, "SKILL.md") : resolve4(directory, entry.name);
+      if (!candidate.endsWith(".md"))
+        continue;
+      try {
+        const content = await readFile6(candidate, "utf8");
+        const frontmatter = /^---\s*\n([\s\S]*?)\n---\s*\n/.exec(content)?.[1] ?? "";
+        const name = /^name:\s*(.+)$/m.exec(frontmatter)?.[1]?.trim() ?? basename(candidate, ".md");
+        const description = /^description:\s*(.+)$/m.exec(frontmatter)?.[1]?.trim() ?? firstParagraph(content);
+        skills.push({ name, description, path: candidate, content });
+      } catch {
+      }
+    }
+    return skills;
+  } catch (error) {
+    if (error.code === "ENOENT")
+      return [];
+    throw error;
+  }
+}
+function firstParagraph(content) {
+  return content.replace(/^---[\s\S]*?---/, "").split(/\n\s*\n/).map((item) => item.trim()).find(Boolean) ?? "";
+}
+var SkillCatalog;
+var init_skills = __esm({
+  "packages/core/dist/skills.js"() {
+    "use strict";
+    SkillCatalog = class {
+      projectRoot;
+      constructor(projectRoot) {
+        this.projectRoot = projectRoot;
+      }
+      async list() {
+        const directories = [
+          resolve4(this.projectRoot, "skills"),
+          resolve4(this.projectRoot, ".webcat", "skills"),
+          resolve4(homedir(), ".webcat", "skills")
+        ];
+        const discovered = /* @__PURE__ */ new Map();
+        for (const directory of directories) {
+          for (const skill of await scan(directory))
+            discovered.set(skill.name, skill);
+        }
+        return [...discovered.values()].sort((a, b) => a.name.localeCompare(b.name));
+      }
+    };
+  }
+});
+
+// packages/core/dist/report.js
+function renderMarkdownReport(

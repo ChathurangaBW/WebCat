@@ -1,80 +1,74 @@
 # WebCat
 
-WebCat is a **terminal-native AI swarm for authorized web-application security assessment**. It coordinates specialized agents, connects to generic Model Context Protocol (MCP) security tools, enforces engagement scope before external actions, records redacted evidence, validates candidate findings, and generates Markdown and JSON reports.
+WebCat is a terminal-native AI swarm for **authorized web application security assessment**. It coordinates isolated specialist agents, connects to generic Model Context Protocol (MCP) security tools, enforces engagement scope before external actions, records redacted evidence, independently validates candidate findings, and generates Markdown or JSON reports.
 
-WebCat is a CLI/TUI product. It does not require a browser dashboard or a separate application server.
+WebCat has no browser dashboard and does not contain a built-in exploit library. All external actions flow through configured MCP servers and a deterministic policy gateway.
 
-## Capabilities
+## Current release
 
-- interactive terminal workspace and headless CLI
-- project initialization, diagnostics, session persistence, and resume
-- deny-by-default host, scheme, port, path, and operation-risk enforcement
-- stdio and streamable HTTP/SSE MCP transports
-- built-in and custom MCP capability classification
-- output filtering for out-of-scope MCP records
-- persistent operator approvals with expiry and revocation
-- request-rate and parallelism controls
-- configurable chat-completions-compatible model endpoint
+This repository contains the WebCat 1.0 implementation:
+
+- CLI and interactive TUI
+- explicit authorization window and deny-by-default scope engine
+- observe, manual, and authorized-auto modes
+- expiring, capability-scoped approvals
+- stdio and streamable HTTP/SSE MCP JSON-RPC clients
+- generic MCP tool discovery and capability classification
+- Caido and Burp starter configurations
+- output filtering for out-of-scope records
+- rate and parallelism controls
+- OpenAI-compatible model provider and deterministic mock provider
 - bounded parallel specialist-agent swarm with isolated conversations
-- hypotheses, evidence hashing, secret redaction, and hash-chained audit records
-- candidate, validator, and critic workflow
-- Markdown skill discovery from repository, project, and user directories
-- Markdown and JSON reporting
+- hypotheses, redacted evidence, SHA-256 integrity, and hash-chained audit
+- validator and critic gates before findings are promoted
+- resumable sessions and Markdown/JSON reporting
+- unit tests, smoke tests, and GitHub Actions CI
 
-## Architecture
+## Safety boundary
 
-```text
-WebCat CLI / TUI
-       |
-       v
-Session + Workflow Runtime
-       |
-       v
-Swarm Orchestrator ---- Skills Catalog
-       |        |        |
-       v        v        v
-Specialists / Validator / Critic
-       |
-       v
-MCP Capability Gateway
-classify -> scope -> approval -> rate limit -> execute -> filter
-       |
-       v
-External MCP Servers
-       |
-       v
-Evidence / Hypotheses / Findings / Audit / Reports
-```
+WebCat is for systems you are explicitly authorized to assess. It does not infer authorization from a URL, a model response, proxy history, or an MCP tool.
+
+An external operation must pass:
+
+1. capability classification;
+2. authorization-window validation;
+3. deny rules;
+4. allow rules;
+5. engagement-mode policy;
+6. high/destructive risk policy;
+7. operator approval policy;
+8. request-rate and parallelism limits;
+9. evidence redaction and audit recording.
+
+The model cannot bypass those checks. Active operations without a concrete target are blocked.
 
 ## Requirements
 
 - Node.js 22 or later
-- pnpm 10
-- a chat-completions-compatible model endpoint
-- optional MCP servers for proxy, browser, scanner, sitemap, or workflow tooling
+- npm 10 or later
+- an OpenAI-compatible chat-completions endpoint, or the built-in mock provider
+- optional MCP servers such as Caido, Burp, browser tooling, scanners, or custom security adapters
 
-## Build and test
+## Install and test
+
+WebCat ships as a dependency-free Node.js source distribution.
 
 ```bash
-corepack enable
-pnpm install
-pnpm typecheck
-pnpm test
-pnpm smoke
+npm install
+npm test
+npm run smoke
 ```
 
 Run directly:
 
 ```bash
-pnpm build
-node apps/webcat/dist/main.js --version
-node apps/webcat/dist/main.js tui
+node bin/webcat.mjs --version
+node bin/webcat.mjs tui
 ```
 
-Install the repository command locally:
+Install the command locally:
 
 ```bash
-pnpm build
 npm link
 webcat --version
 ```
@@ -85,17 +79,19 @@ webcat --version
 webcat init
 ```
 
-Edit:
+Edit the generated files:
 
-- `.webcat/engagement.yaml` — authorization, mode, limits, allow rules, and deny rules
-- `.webcat/config.toml` — model, swarm, evidence, and approval policy
-- `.webcat/mcp.json` — enabled MCP servers and optional custom capability mappings
+- `.webcat/engagement.json` — written authorization, mode, rate limits, allow rules, and deny rules
+- `.webcat/config.json` — model, swarm, and evidence policy
+- `.webcat/mcp.json` — enabled MCP servers and custom capability mappings
+
+The generated engagement is intentionally non-operational until placeholder authorization values and target scope are replaced.
 
 Validate the setup:
 
 ```bash
 webcat doctor
-webcat scope-check https://app.example.test/api --operation passive
+webcat scope-check https://app.example.test/api/users --operation passive
 webcat mcp status
 ```
 
@@ -105,41 +101,76 @@ webcat mcp status
 webcat run --objective "Map the authorized API and assess object authorization"
 ```
 
-Resume an interrupted or failed session:
+Resume:
 
 ```bash
 webcat resume
 webcat resume session_abc123
 ```
 
-## Common commands
+Generate reports:
 
 ```bash
-webcat tui
-webcat profiles
-webcat skills
-webcat mcp tools
-webcat mcp call proxy proxy_history --args '{}'
-webcat approvals grant --risk active --ttl 20m --reason "Controlled authorization validation"
-webcat hypotheses list
-webcat findings list
-webcat evidence list
-webcat audit verify
-webcat report --format markdown
-webcat report --format json
+webcat report --format markdown --output .webcat/reports/report.md
+webcat report --format json --output .webcat/reports/report.json
 ```
 
-## Modes
+## Common commands
+
+```text
+webcat init [--force]
+webcat doctor [--json]
+webcat scope-check <url> --operation passive|active|high|destructive
+webcat profiles [--json]
+webcat skills [--json]
+webcat mcp status [--connect] [--json]
+webcat mcp tools [--json]
+webcat mcp call <server> <tool> --args '{...}'
+webcat approvals grant --risk active --ttl 20m --reason "Controlled validation"
+webcat approvals list
+webcat approvals revoke <id>
+webcat run --objective "..."
+webcat resume [session-id]
+webcat hypotheses [--json]
+webcat findings [--json]
+webcat evidence verify
+webcat audit verify
+webcat report --format markdown|json
+webcat tui
+```
+
+## Engagement modes
 
 | Mode | Behavior |
 |---|---|
-| `observe` | Passive/read-only MCP capabilities only. Active calls are blocked at the gateway. |
-| `manual` | Active in-scope calls require one-time or stored operator approval. |
-| `authorized-auto` | Active in-scope calls may run automatically. High and destructive calls still require explicit policy and approval. |
+| `observe` | Passive/read-only capabilities only. Active, high, and destructive calls are blocked. |
+| `manual` | Non-passive in-scope calls require an active operator approval. |
+| `authorized-auto` | Active in-scope calls may run automatically. High and destructive calls still require policy enablement and approval. |
 
-## Safety boundary
+## Architecture
 
-WebCat is for systems you are explicitly authorized to assess. An external operation must pass capability classification, scope evaluation, engagement policy, approval policy, and rate controls before execution. The model cannot bypass these checks.
+```text
+CLI / TUI
+   |
+   v
+Session state machine
+   |
+   v
+Bounded swarm orchestrator ---- Markdown skill catalog
+   |                              |
+   v                              v
+Isolated specialists -> validator -> critic -> report
+   |
+   v
+MCP capability gateway
+classify -> scope -> approval -> rate limit -> execute -> filter
+   |
+   v
+Generic stdio / HTTP / SSE MCP servers
+   |
+   v
+Redacted evidence + hypotheses + findings + hash-chained audit
+```
 
 See:
 
