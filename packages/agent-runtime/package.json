@@ -1,0 +1,1 @@
+{"name":"@webcat/agent-runtime","version":"1.0.0","private":true,"type":"module","exports":"./dist/index.js","types":"./dist/index.d.ts","scripts":{"build":"tsc -p tsconfig.json"},"dependencies":{"@webcat/core":"workspace:*","@webcat/mcp-gateway":"workspace:*","@webcat/agent-profiles":"workspace:*"}}

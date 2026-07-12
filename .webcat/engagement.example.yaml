@@ -1,0 +1,20 @@
+engagement:
+  id: authorized-example
+  name: Authorized Example Assessment
+  authorizationConfirmed: false
+  authorizationReference: CHANGE-ME
+  mode: observe
+  maxRequestsPerSecond: 2
+  maxParallelRequests: 4
+  allowHighRisk: false
+  allowDestructive: false
+  allow:
+    - id: primary
+      scheme: https
+      host: app.example.test
+      port: 443
+      pathPrefix: /
+  deny:
+    - id: reset
+      host: app.example.test
+      pathPrefix: /admin/reset

@@ -1,0 +1,20 @@
+[provider]
+type = "chat-completions"
+baseUrl = "http://127.0.0.1:11434/v1"
+apiKeyEnv = "WEBCAT_MODEL_API_KEY"
+apiKeyRequired = false
+model = "local-security-model"
+timeoutMs = 120000
+maxTokens = 4096
+temperature = 0.1
+
+[swarm]
+maxConcurrency = 4
+maxAgentTurns = 10
+maxRetries = 2
+
+[security]
+redactSecrets = true
+maxEvidenceBytes = 1048576
+requireApprovalForActive = false
+filterOutOfScopeMcpOutput = true

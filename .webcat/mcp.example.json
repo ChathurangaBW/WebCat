@@ -1,0 +1,36 @@
+{
+  "servers": {
+    "caido": {
+      "transport": "stdio",
+      "command": "caido-mcp-server",
+      "args": ["serve"],
+      "enabled": false,
+      "timeoutMs": 60000,
+      "env": {
+        "CAIDO_URL": "http://127.0.0.1:8080",
+        "CAIDO_PAT": "${CAIDO_PAT}"
+      }
+    },
+    "generic-http": {
+      "transport": "http",
+      "url": "http://127.0.0.1:9000/mcp",
+      "enabled": false,
+      "timeoutMs": 60000,
+      "headers": {
+        "Authorization": "Bearer ${WEBCAT_MCP_TOKEN}"
+      },
+      "capabilities": {
+        "custom_history": {
+          "name": "proxy.history.list",
+          "risk": "read",
+          "trusted": true
+        },
+        "custom_replay": {
+          "name": "proxy.request.replay",
+          "risk": "active",
+          "trusted": true
+        }
+      }
+    }
+  }
+}

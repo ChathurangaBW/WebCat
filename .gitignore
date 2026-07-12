@@ -1,6 +1,15 @@
-.webcat/
 node_modules/
+dist/
+*.tsbuildinfo
+.webcat/state/
+.webcat/evidence/
+.webcat/reports/
+.webcat/audit.jsonl
+.webcat/approvals.jsonl
+.webcat/findings.jsonl
+.webcat/hypotheses.jsonl
 .env
 .env.*
 *.log
 .DS_Store
+coverage/
