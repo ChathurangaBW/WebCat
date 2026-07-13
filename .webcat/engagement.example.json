@@ -10,44 +10,20 @@
   "allow": [
     {
       "id": "primary-target",
-      "hosts": [
-        "app.example.test"
-      ],
-      "schemes": [
-        "https"
-      ],
-      "paths": [
-        "/**"
-      ],
-      "operations": [
-        "passive"
-      ]
+      "hosts": ["app.example.test"],
+      "schemes": ["https"],
+      "paths": ["/**"],
+      "operations": ["passive"]
     }
   ],
   "deny": [
     {
       "id": "sensitive-actions",
-      "hosts": [
-        "app.example.test"
-      ],
-      "paths": [
-        "/logout",
-        "/admin/delete/**"
-      ],
-      "operations": [
-        "active",
-        "high",
-        "destructive"
-      ]
+      "hosts": ["app.example.test"],
+      "paths": ["/logout", "/admin/delete/**"],
+      "operations": ["active", "high", "destructive"]
     }
   ],
-  "rateLimit": {
-    "requestsPerMinute": 30,
-    "maxParallel": 2
-  },
-  "riskPolicy": {
-    "allowHighRisk": false,
-    "allowDestructive": false,
-    "approvalTtlMinutes": 20
-  }
+  "rateLimit": { "requestsPerMinute": 30, "maxParallel": 2 },
+  "riskPolicy": { "allowHighRisk": false, "allowDestructive": false, "approvalTtlMinutes": 20 }
 }

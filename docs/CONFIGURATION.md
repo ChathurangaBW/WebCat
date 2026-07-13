@@ -1,55 +1,19 @@
 # Configuration
 
-## `.webcat/engagement.json`
+Project files live under `.webcat`:
 
-Required fields:
+- `config.toml`
+- `engagement.json`
+- `mcp.json`
 
-- `id`, `name`
-- `authorizedBy`
-- `authorizationReference`
-- `startsAt`, `expiresAt`
-- `mode`
-- `allow`, `deny`
-- `rateLimit`
-- `riskPolicy`
+User configuration uses the platform-specific WebCat configuration directory. Project configuration overrides user configuration by section and key.
 
-A scope rule supports:
+## Environment variables
 
-- `hosts`: exact hosts or `*.example.test`
-- `schemes`: `http`, `https`, `ws`, `wss`
-- `ports`
-- `paths`: `*` matches one path segment; `**` crosses segments
-- `methods`
-- `operations`: `passive`, `active`, `high`, `destructive`
+- `WEBCAT_HOME`: isolated root containing config, state, cache, and data directories
+- `WEBCAT_CONFIG_HOME`: configuration-directory override
+- `WEBCAT_LOG_LEVEL`: `debug`, `info`, `warn`, or `error`
+- `WEBCAT_LOG_FILE`: exact log-file override
+- `WEBCAT_DISABLE_UPDATE_CHECK`: reserved for distribution integrations
 
-Deny rules are evaluated first.
-
-## `.webcat/config.json`
-
-`model`:
-
-- `provider`: `openai-compatible` or `mock`
-- `baseUrl`
-- `apiKeyEnv`
-- `model`
-- `timeoutMs`
-- optional static headers
-
-`swarm`:
-
-- `maxConcurrency`
-- `maxAgentTurns`
-- `maxToolCallsPerAgent`
-- optional `selectedProfiles`
-
-`evidence`:
-
-- `maxBodyBytes`
-- `redactHeaders`
-- `redactKeys`
-
-## Environment
-
-- the configured model API key variable, such as `OPENAI_API_KEY`
-- `WEBCAT_DEBUG=1` to include stack traces on CLI failures
-- server-specific environment variables referenced by MCP configuration
+MCP JSON values support `${VARIABLE}` interpolation. Diagnostics redact configured header values and token-like fields.
