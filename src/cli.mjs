@@ -3,7 +3,7 @@ import { stdin, stdout } from "node:process";
 import { IDENTITY, banner } from "./identity.mjs";
 import { userPaths } from "./paths.mjs";
 import { Logger } from "./logger.mjs";
-import { initCommand, doctorCommand, pathsCommand, scopeCheckCommand, profilesCommand, mcpCommand, approvalsCommand } from "./commands-core.mjs";
+import { initCommand, doctorCommand, pathsCommand, scopeCheckCommand, profilesCommand, mcpCommand, burpCommand, approvalsCommand } from "./commands-core.mjs";
 import { runCommand, resumeCommand, sessionsCommand, recordsCommand, evidenceCommand, auditCommand, reportCommand } from "./commands-runtime.mjs";
 import { tokenize } from "./cli-utils.mjs";
 
@@ -35,6 +35,7 @@ async function dispatch(command, args, context) {
     case "scope-check": return scopeCheckCommand(args, context);
     case "profiles": return profilesCommand(args);
     case "mcp": return mcpCommand(args, context);
+    case "burp": return burpCommand(args, context);
     case "approvals": return approvalsCommand(args, context);
     case "run": return runCommand(args, context);
     case "resume": return resumeCommand(args, context);
@@ -60,6 +61,8 @@ Usage:
   webcat profiles [--json]
   webcat mcp status|tools [server] [--json]
   webcat mcp call <server> <tool> --args '{"url":"https://target"}' [--approve]
+  webcat burp status|doctor|tools [server] [--json]
+  webcat burp presets|skills [--json]
   webcat approvals list|grant|revoke
   webcat run --objective "Authorized assessment objective" [--json]
   webcat resume [session-id] [--json]
@@ -71,6 +74,10 @@ Usage:
   webcat report [session-id] [--format markdown|json]
   webcat tui
 
+Burp MCP:
+  Presets support the official PortSwigger SSE/stdio server, BurpMCP SSE,
+  and Burp MCP Bridge over stdio or streamable HTTP. Dangerous tools are disabled by default.
+
 Configuration:
   Project: .webcat/config.toml, .webcat/engagement.json, .webcat/mcp.json
   User:    ${IDENTITY.environment.configHome} or the platform WebCat configuration directory
@@ -80,7 +87,6 @@ Safety:
   External actions require current written authorization, an explicit in-scope target,
   permitted engagement mode and risk policy, and operator approval where required.`;
 }
-
 
 async function tuiCommand(context) {
   const terminal = createInterface({ input: stdin, output: stdout });
@@ -98,4 +104,3 @@ async function tuiCommand(context) {
   } finally { terminal.close(); }
   return 0;
 }
-
