@@ -16,13 +16,19 @@
       }
     },
     "burp": {
-      "transport": "http",
-      "url": "http://127.0.0.1:9876/mcp",
-      "enabled": false,
-      "timeoutMs": 60000
+      "preset": "portswigger-sse",
+      "enabled": false
     },
-    "generic_sse": {
-      "transport": "sse",
+    "burpmcp": {
+      "preset": "swgee-sse",
+      "enabled": false
+    },
+    "burp_bridge": {
+      "preset": "bridge-stdio",
+      "enabled": false
+    },
+    "generic_http": {
+      "transport": "http",
       "url": "http://127.0.0.1:9000/mcp",
       "enabled": false,
       "timeoutMs": 60000,
