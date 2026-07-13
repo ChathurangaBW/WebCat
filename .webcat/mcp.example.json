@@ -4,40 +4,29 @@
     "caido": {
       "transport": "stdio",
       "command": "caido-mcp",
-      "args": [
-        "serve"
-      ],
+      "args": ["serve"],
       "enabled": false,
-      "disabledTools": [
-        "race_window_send"
-      ],
+      "timeoutMs": 60000,
+      "disabledTools": ["race_window_send"],
       "capabilityMap": {
-        "list_requests": {
-          "capability": "proxy.read",
-          "risk": "passive",
-          "requiresTarget": false
-        },
-        "get_request": {
-          "capability": "proxy.read",
-          "risk": "passive",
-          "requiresTarget": false
-        },
-        "send_request": {
-          "capability": "http.execute",
-          "risk": "active",
-          "requiresTarget": true
-        },
-        "run_workflow": {
-          "capability": "scanner.run",
-          "risk": "high",
-          "requiresTarget": true
-        }
+        "list_requests": { "capability": "proxy.read", "risk": "passive", "requiresTarget": false },
+        "get_request": { "capability": "proxy.read", "risk": "passive", "requiresTarget": false },
+        "send_request": { "capability": "http.execute", "risk": "active", "requiresTarget": true },
+        "run_workflow": { "capability": "scanner.run", "risk": "high", "requiresTarget": true }
       }
     },
     "burp": {
       "transport": "http",
       "url": "http://127.0.0.1:9876/mcp",
-      "enabled": false
+      "enabled": false,
+      "timeoutMs": 60000
+    },
+    "generic_sse": {
+      "transport": "sse",
+      "url": "http://127.0.0.1:9000/mcp",
+      "enabled": false,
+      "timeoutMs": 60000,
+      "headers": { "authorization": "Bearer ${WEBCAT_MCP_TOKEN}" }
     }
   }
 }

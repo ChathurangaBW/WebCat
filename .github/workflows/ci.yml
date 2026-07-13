@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  qa:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,5 +18,5 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: npm test
-      - run: npm run smoke
+      - run: npm run qa
+      - run: npm pack --dry-run

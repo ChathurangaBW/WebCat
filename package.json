@@ -1,29 +1,35 @@
 {
-  "name": "webcat",
-  "version": "1.0.0",
-  "description": "Terminal-native AI swarm for authorized web application security assessment",
-  "license": "MIT",
+  "name": "webcat-security",
+  "version": "1.1.0",
+  "description": "Terminal-native AI swarm runtime for authorized web application security assessment",
   "type": "module",
+  "license": "MIT",
+  "private": false,
   "bin": {
     "webcat": "bin/webcat.mjs"
   },
   "files": [
-    "bin/",
-    "src/",
+    "bin",
+    "src",
+    "docs",
     "README.md",
-    "LICENSE",
-    "NOTICE.md",
     "SECURITY.md",
-    ".webcat/*.example.json",
-    "docs/"
+    "THIRD_PARTY_NOTICES.md",
+    "LICENSE"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22"
   },
   "scripts": {
+    "lint": "node scripts/lint.mjs",
+    "typecheck": "node scripts/typecheck.mjs",
     "test": "node --test test/*.test.mjs",
-    "smoke": "node test/e2e.mjs",
-    "start": "node bin/webcat.mjs",
-    "check": "npm test && npm run smoke"
+    "test:integration": "node scripts/smoke.mjs",
+    "test:relocation": "node scripts/relocation-test.mjs",
+    "build": "node scripts/build.mjs",
+    "verify:branding": "node scripts/verify-webcat-branding.mjs",
+    "verify:built": "node scripts/verify-webcat-branding.mjs --built-only",
+    "smoke": "node scripts/smoke.mjs",
+    "qa": "npm run lint && npm run typecheck && npm test && npm run build && npm run test:integration && npm run test:relocation && npm run verify:branding && npm run verify:built"
   }
 }

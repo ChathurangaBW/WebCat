@@ -1,77 +1,27 @@
 # WebCat
 
-WebCat is a terminal-native AI swarm for **authorized web application security assessment**. It coordinates isolated specialist agents, connects to generic Model Context Protocol (MCP) security tools, enforces engagement scope before external actions, records redacted evidence, independently validates candidate findings, and generates Markdown or JSON reports.
+WebCat is a terminal-native AI swarm runtime for **authorized web application security assessment**. It coordinates isolated specialist profiles, connects to generic Model Context Protocol (MCP) servers, enforces scope before external actions, records redacted evidence, validates candidate findings, and produces Markdown or JSON reports.
 
-WebCat has no browser dashboard and does not contain a built-in exploit library. All external actions flow through configured MCP servers and a deterministic policy gateway.
-
-## Current release
-
-This repository contains the WebCat 1.0 implementation:
-
-- CLI and interactive TUI
-- explicit authorization window and deny-by-default scope engine
-- observe, manual, and authorized-auto modes
-- expiring, capability-scoped approvals
-- stdio and streamable HTTP/SSE MCP JSON-RPC clients
-- generic MCP tool discovery and capability classification
-- Caido and Burp starter configurations
-- output filtering for out-of-scope records
-- rate and parallelism controls
-- OpenAI-compatible model provider and deterministic mock provider
-- bounded parallel specialist-agent swarm with isolated conversations
-- hypotheses, redacted evidence, SHA-256 integrity, and hash-chained audit
-- validator and critic gates before findings are promoted
-- resumable sessions and Markdown/JSON reporting
-- unit tests, smoke tests, and GitHub Actions CI
-
-## Safety boundary
-
-WebCat is for systems you are explicitly authorized to assess. It does not infer authorization from a URL, a model response, proxy history, or an MCP tool.
-
-An external operation must pass:
-
-1. capability classification;
-2. authorization-window validation;
-3. deny rules;
-4. allow rules;
-5. engagement-mode policy;
-6. high/destructive risk policy;
-7. operator approval policy;
-8. request-rate and parallelism limits;
-9. evidence redaction and audit recording.
-
-The model cannot bypass those checks. Active operations without a concrete target are blocked.
+WebCat has no browser dashboard and no built-in exploit library. External operations are executed only through configured MCP servers after deterministic authorization, scope, risk, approval, and rate-limit checks.
 
 ## Requirements
 
 - Node.js 22 or later
 - npm 10 or later
-- an OpenAI-compatible chat-completions endpoint, or the built-in mock provider
-- optional MCP servers such as Caido, Burp, browser tooling, scanners, or custom security adapters
+- Optional: an OpenAI-compatible chat-completions endpoint
+- Optional: MCP servers for proxy, browser, scanner, or workflow tooling
 
-## Install and test
-
-WebCat ships as a dependency-free Node.js source distribution.
+## Install and QA
 
 ```bash
-npm install
-npm test
-npm run smoke
-```
-
-Run directly:
-
-```bash
-node bin/webcat.mjs --version
-node bin/webcat.mjs tui
-```
-
-Install the command locally:
-
-```bash
+npm ci
+npm run qa
 npm link
+webcat --help
 webcat --version
 ```
+
+The source distribution has no runtime dependencies.
 
 ## Initialize an engagement
 
@@ -81,102 +31,66 @@ webcat init
 
 Edit the generated files:
 
-- `.webcat/engagement.json` — written authorization, mode, rate limits, allow rules, and deny rules
-- `.webcat/config.json` — model, swarm, and evidence policy
-- `.webcat/mcp.json` — enabled MCP servers and custom capability mappings
+- `.webcat/config.toml` — model, swarm, logging, and evidence settings
+- `.webcat/engagement.json` — written authorization, time window, scope, mode, risk policy, and rate limits
+- `.webcat/mcp.json` — MCP transports, tool filters, environment interpolation, and explicit capability mappings
 
-The generated engagement is intentionally non-operational until placeholder authorization values and target scope are replaced.
-
-Validate the setup:
-
-```bash
-webcat doctor
-webcat scope-check https://app.example.test/api/users --operation passive
-webcat mcp status
-```
-
-## Run the swarm
-
-```bash
-webcat run --objective "Map the authorized API and assess object authorization"
-```
-
-Resume:
-
-```bash
-webcat resume
-webcat resume session_abc123
-```
-
-Generate reports:
-
-```bash
-webcat report --format markdown --output .webcat/reports/report.md
-webcat report --format json --output .webcat/reports/report.json
-```
+The generated engagement contains placeholders and cannot authorize external actions until they are replaced.
 
 ## Common commands
 
-```text
-webcat init [--force]
-webcat doctor [--json]
-webcat scope-check <url> --operation passive|active|high|destructive
-webcat profiles [--json]
-webcat skills [--json]
-webcat mcp status [--connect] [--json]
-webcat mcp tools [--json]
-webcat mcp call <server> <tool> --args '{...}'
-webcat approvals grant --risk active --ttl 20m --reason "Controlled validation"
-webcat approvals list
-webcat approvals revoke <id>
-webcat run --objective "..."
-webcat resume [session-id]
-webcat hypotheses [--json]
-webcat findings [--json]
-webcat evidence verify
+```bash
+webcat doctor
+webcat paths
+webcat scope-check https://app.example.test/api --operation passive
+webcat profiles
+webcat mcp status
+webcat mcp tools caido
+webcat approvals grant --risk active --ttl 20 --reason "Controlled validation"
+webcat run --objective "Assess object authorization within the approved scope"
 webcat audit verify
-webcat report --format markdown|json
+webcat evidence verify
+webcat report --format markdown
 webcat tui
 ```
 
-## Engagement modes
+## Runtime paths
 
-| Mode | Behavior |
-|---|---|
-| `observe` | Passive/read-only capabilities only. Active, high, and destructive calls are blocked. |
-| `manual` | Non-passive in-scope calls require an active operator approval. |
-| `authorized-auto` | Active in-scope calls may run automatically. High and destructive calls still require policy enablement and approval. |
+WebCat uses platform-specific user directories and never depends on the repository parent-directory name.
 
-## Architecture
+- Linux: XDG configuration, state, cache, and data directories under `webcat`
+- macOS: `Library/Application Support/WebCat`, `Library/Caches/WebCat`, and `Library/Logs/WebCat`
+- Windows: `%APPDATA%\WebCat` and `%LOCALAPPDATA%\WebCat`
 
-```text
-CLI / TUI
-   |
-   v
-Session state machine
-   |
-   v
-Bounded swarm orchestrator ---- Markdown skill catalog
-   |                              |
-   v                              v
-Isolated specialists -> validator -> critic -> report
-   |
-   v
-MCP capability gateway
-classify -> scope -> approval -> rate limit -> execute -> filter
-   |
-   v
-Generic stdio / HTTP / SSE MCP servers
-   |
-   v
-Redacted evidence + hypotheses + findings + hash-chained audit
-```
+Overrides:
 
-See:
+- `WEBCAT_HOME`
+- `WEBCAT_CONFIG_HOME`
+- `WEBCAT_LOG_LEVEL`
+- `WEBCAT_LOG_FILE`
+- `WEBCAT_DISABLE_UPDATE_CHECK`
+
+The default log filename is `webcat.log`. Secrets, cookies, authorization headers, and token-like fields are redacted before persistence.
+
+## Safety boundary
+
+An external action must pass all of the following:
+
+1. Current written authorization window
+2. Explicit deny rules
+3. Explicit allow rules
+4. Engagement mode
+5. High-risk and destructive-operation policy
+6. Operator approval where required
+7. Request rate and parallelism controls
+8. Redacted evidence and hash-chained audit recording
+
+Active tools without an extractable absolute target URL are blocked. Active tools inferred only from naming are blocked until an explicit capability mapping marks them trusted.
+
+## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Configuration](docs/CONFIGURATION.md)
-- [MCP integration](docs/MCP.md)
-- [Operations](docs/OPERATIONS.md)
+- [MCP](docs/MCP.md)
 - [Security model](docs/SECURITY_MODEL.md)
-- [Development](docs/DEVELOPMENT.md)
+- [Release QA](docs/RELEASE_QA.md)

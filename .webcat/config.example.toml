@@ -1,0 +1,17 @@
+[model]
+provider = "mock"
+baseUrl = "http://127.0.0.1:11434/v1"
+apiKeyEnv = "WEBCAT_MODEL_API_KEY"
+model = "webcat-local"
+timeoutMs = 120000
+
+[swarm]
+maxConcurrency = 3
+maxAgentTurns = 6
+maxToolCallsPerAgent = 8
+
+[logging]
+level = "info"
+
+[evidence]
+maxBodyBytes = 262144

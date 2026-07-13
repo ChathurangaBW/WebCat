@@ -1,32 +1,9 @@
 # Security policy
 
-## Intended use
+WebCat is intended only for systems covered by explicit written authorization.
 
-WebCat is intended only for web applications and APIs covered by explicit, current authorization. Do not use it against public targets, third-party infrastructure, or data outside the written engagement scope.
+The runtime is deny-by-default. External MCP operations require a current authorization window, a concrete target, an allow-rule match, no deny-rule match, permitted engagement mode, permitted risk class, operator approval where required, and request-rate controls.
 
-## Reporting a vulnerability in WebCat
+Report security defects privately to the repository owner. Do not include production credentials, session cookies, authorization headers, private evidence, or target data in public issues.
 
-Do not disclose a WebCat vulnerability in a public issue if it could expose credentials, bypass scope controls, corrupt evidence, or permit unintended external actions. Contact the repository owner privately through GitHub first.
-
-Include:
-
-- affected commit or version;
-- reproduction steps;
-- expected and actual policy behavior;
-- whether the issue can bypass scope, approvals, redaction, or audit integrity;
-- a minimal patch or mitigation when available.
-
-## Security invariants
-
-Changes must preserve these invariants:
-
-- no active external call without a concrete target;
-- deny rules override allow rules;
-- wildcard hosts do not match sibling or lookalike domains;
-- expired or placeholder authorization blocks execution;
-- model output cannot bypass the gateway;
-- untrusted MCP output is never inserted as system instructions;
-- evidence redaction occurs before persistence;
-- candidates are not promoted without validation;
-- destructive operations remain disabled unless explicitly enabled and approved;
-- audit-chain verification detects mutation.
+WebCat redacts common secret fields before writing logs, evidence, and audit records. Operators remain responsible for reviewing third-party MCP server behavior and storage.
