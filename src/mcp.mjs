@@ -1,16 +1,19 @@
-import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
 import { setTimeout as sleep } from "node:timers/promises";
 import { evaluateScope, operationRequiresApproval } from "./scope.mjs";
 import { redact } from "./redact.mjs";
+import { burpCapability, classifyBurpCall } from "./burp.mjs";
+import { createMcpClient } from "./mcp-transports.mjs";
+import { extractTarget, extractTargets, filterOutOfScope, policyHintName, stripPolicyMetadata } from "./mcp-targets.mjs";
 
-const PASSIVE_PATTERN = /(?:^(?:list|get|read|search|find|inspect|status|show|query|describe)(?:_|$)|history|sitemap|scope|project|environment|cookie.*list)/i;
-const DESTRUCTIVE_PATTERN = /(delete|remove|drop|destroy|purge|reset|clear|terminate)/i;
-const HIGH_PATTERN = /(scan|workflow|automate|fuzz|race|intruder|brut|crawl|spider)/i;
-const ACTIVE_PATTERN = /(send|replay|request|execute|run|create|update|set|intercept|tamper)/i;
+const PASSIVE_PATTERN = /(?:^(?:list|get|read|search|find|inspect|status|show|query|describe)(?:[_-]|$)|history|sitemap|scope|project|environment|cookie.*list)/i;
+const DESTRUCTIVE_PATTERN = /(delete|remove|drop|destroy|purge|reset|clear|terminate|shell[_-]?execute)/i;
+const HIGH_PATTERN = /(scan|workflow|automate|fuzz|race|intruder|brut|crawl|spider|interceptor)/i;
+const ACTIVE_PATTERN = /(send|replay|request|execute|run|create|update|set|intercept|tamper|resend)/i;
+
+export { extractTarget, extractTargets, stripPolicyMetadata };
 
 export function classifyTool(serverName, tool, serverConfig = {}) {
-  const mapped = serverConfig.capabilityMap?.[tool.name];
+  const mapped = serverConfig.capabilityMap?.[tool.name] ?? burpCapability(tool.name, serverConfig);
   if (mapped) return {
     capability: mapped.capability ?? `${serverName}.${tool.name}`,
     risk: mapped.risk ?? "active",
@@ -23,44 +26,29 @@ export function classifyTool(serverName, tool, serverConfig = {}) {
   else if (HIGH_PATTERN.test(text)) risk = "high";
   else if (PASSIVE_PATTERN.test(text)) risk = "passive";
   else if (ACTIVE_PATTERN.test(text)) risk = "active";
-  return {
-    capability: `${serverName}.${tool.name}`,
-    risk,
-    requiresTarget: risk !== "passive",
-    trusted: false
-  };
+  return { capability: `${serverName}.${tool.name}`, risk, requiresTarget: risk !== "passive", trusted: false };
 }
 
-export function extractTarget(args) {
-  const candidates = [];
-  walk(args, (key, value) => {
-    if (typeof value !== "string") return;
-    if (/^(url|uri|target|endpoint|destination|request_url)$/i.test(key)) candidates.unshift(value);
-    else if (/^https?:\/\//i.test(value)) candidates.push(value);
-  });
-  for (const candidate of candidates) {
-    try { return new URL(candidate).toString(); } catch { /* continue */ }
-  }
-  return undefined;
+export function classifyToolCall(serverName, tool, args, serverConfig = {}) {
+  return classifyBurpCall(tool.name, args, serverConfig, classifyTool(serverName, tool, serverConfig));
 }
 
 export class McpManager {
-  constructor(config) { this.config = config; this.clients = new Map(); }
-
-  servers() {
-    return Object.entries(this.config.servers).map(([name, value]) => ({ name, ...value }));
-  }
+  constructor(config) { this.config = config; this.clients = new Map(); this.toolCache = new Map(); }
+  servers() { return Object.entries(this.config.servers).map(([name, value]) => ({ name, ...value })); }
 
   async tools(serverName) {
     const server = this.#server(serverName);
     if (server.enabled === false) return [];
+    if (this.toolCache.has(serverName)) return this.toolCache.get(serverName);
     const client = await this.#client(serverName, server);
     const result = await client.request("tools/list", {});
-    const tools = Array.isArray(result?.tools) ? result.tools : [];
-    return tools
+    const tools = (Array.isArray(result?.tools) ? result.tools : [])
       .filter((tool) => !server.enabledTools || server.enabledTools.includes(tool.name))
       .filter((tool) => !server.disabledTools?.includes(tool.name))
       .map((tool) => ({ ...tool, classification: classifyTool(serverName, tool, server) }));
+    this.toolCache.set(serverName, tools);
+    return tools;
   }
 
   async call(serverName, toolName, args) {
@@ -69,12 +57,14 @@ export class McpManager {
     if (server.enabledTools && !server.enabledTools.includes(toolName)) throw new Error(`MCP tool ${toolName} is not enabled`);
     if (server.disabledTools?.includes(toolName)) throw new Error(`MCP tool ${toolName} is disabled`);
     const client = await this.#client(serverName, server);
-    return client.request("tools/call", { name: toolName, arguments: args });
+    return client.request("tools/call", { name: toolName, arguments: stripPolicyMetadata(args) });
   }
 
   async close() {
-    await Promise.all([...this.clients.values()].map((client) => client.close?.()));
+    const clients = await Promise.allSettled([...this.clients.values()]);
+    await Promise.all(clients.filter((item) => item.status === "fulfilled").map((item) => item.value.close?.()));
     this.clients.clear();
+    this.toolCache.clear();
   }
 
   #server(name) {
@@ -85,10 +75,14 @@ export class McpManager {
 
   async #client(name, server) {
     if (this.clients.has(name)) return this.clients.get(name);
-    const client = server.transport === "stdio" ? new StdioClient(server) : new HttpClient(server);
-    await client.initialize();
-    this.clients.set(name, client);
-    return client;
+    const pending = (async () => {
+      const client = createMcpClient(server);
+      await client.initialize();
+      return client;
+    })();
+    this.clients.set(name, pending);
+    try { return await pending; }
+    catch (error) { this.clients.delete(name); throw error; }
   }
 }
 
@@ -105,26 +99,19 @@ export class McpGuard {
 
   async call(serverName, tool, args, options = {}) {
     const server = this.manager.config.servers[serverName];
-    const classification = classifyTool(serverName, tool, server);
-    if (!classification.trusted && classification.risk !== "passive") {
-      throw new Error(`Active MCP tool ${tool.name} requires an explicit capabilityMap entry`);
-    }
-    const target = extractTarget(args);
-    if (classification.requiresTarget && !target) throw new Error(`MCP tool ${tool.name} requires an extractable absolute target URL`);
-    if (target) {
+    const classification = classifyToolCall(serverName, tool, args, server);
+    if (!classification.trusted && classification.risk !== "passive") throw new Error(`Active MCP tool ${tool.name} requires an explicit capabilityMap entry`);
+    const targets = extractTargets(args);
+    if (classification.requiresTarget && targets.length === 0) throw new Error(`MCP tool ${tool.name} requires an extractable absolute target URL or ${policyHintName}.target policy hint`);
+    for (const target of targets) {
       const scope = evaluateScope(this.engagement, target, classification.risk, options.now ?? new Date());
       if (!scope.allowed) {
-        await this.audit.append("mcp.blocked", "system", { serverName, tool: tool.name, target, reason: scope.reason });
+        await this.audit.append("mcp.blocked", "system", { serverName, tool: tool.name, target, targets, reason: scope.reason });
         throw new Error(scope.reason);
       }
     }
     if (operationRequiresApproval(this.engagement, classification.risk)) {
-      const permitted = options.approve === true || await this.approvals.permits({
-        risk: classification.risk,
-        server: serverName,
-        tool: tool.name,
-        target: target ?? "*"
-      }, options.now ?? new Date());
+      const permitted = options.approve === true || await permitsEveryTarget(this.approvals, { risk: classification.risk, server: serverName, tool: tool.name, targets }, options.now ?? new Date());
       if (!permitted) throw new Error(`Operator approval is required for ${classification.risk} MCP operation`);
     }
     await this.#throttle();
@@ -132,15 +119,13 @@ export class McpGuard {
     if (this.#active >= maxParallel) throw new Error("MCP parallel request limit reached");
     this.#active += 1;
     try {
-      await this.audit.append("mcp.call.started", "operator", { serverName, tool: tool.name, target, risk: classification.risk });
+      await this.audit.append("mcp.call.started", "operator", { serverName, tool: tool.name, target: targets[0], targets, risk: classification.risk });
       const result = await this.manager.call(serverName, tool.name, args);
-      const filtered = target ? filterOutOfScope(result, this.engagement) : result;
-      const evidence = await this.evidence.add({ source: `mcp:${serverName}:${tool.name}`, target, data: filtered });
-      await this.audit.append("mcp.call.completed", "system", { serverName, tool: tool.name, target, evidenceId: evidence.id });
-      return { result: redact(filtered), evidence, classification };
-    } finally {
-      this.#active -= 1;
-    }
+      const filtered = filterOutOfScope(result, this.engagement);
+      const evidence = await this.evidence.add({ source: `mcp:${serverName}:${tool.name}`, target: targets[0], data: filtered });
+      await this.audit.append("mcp.call.completed", "system", { serverName, tool: tool.name, target: targets[0], targets, evidenceId: evidence.id });
+      return { result: redact(filtered), evidence, classification, targets };
+    } finally { this.#active -= 1; }
   }
 
   async #throttle() {
@@ -152,95 +137,8 @@ export class McpGuard {
   }
 }
 
-class StdioClient {
-  constructor(config) { this.config = config; this.sequence = 0; this.pending = new Map(); }
-  async initialize() {
-    this.child = spawn(this.config.command, this.config.args ?? [], {
-      cwd: this.config.cwd,
-      env: { ...process.env, ...(this.config.env ?? {}) },
-      stdio: ["pipe", "pipe", "inherit"],
-      shell: false
-    });
-    this.child.once("error", (error) => this.#rejectAll(error));
-    const lines = createInterface({ input: this.child.stdout });
-    lines.on("line", (line) => this.#message(line));
-    await this.request("initialize", {
-      protocolVersion: "2025-03-26",
-      capabilities: {},
-      clientInfo: { name: "webcat", version: "1.1.0" }
-    });
-    this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
-  }
-  request(method, params) {
-    const id = ++this.sequence;
-    const timeoutMs = this.config.timeoutMs ?? 60_000;
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`MCP request timed out: ${method}`)); }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
-      this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
-    });
-  }
-  async close() { this.child?.kill(); }
-  #message(line) {
-    let message;
-    try { message = JSON.parse(line); } catch { return; }
-    if (!Object.hasOwn(message, "id")) return;
-    const pending = this.pending.get(message.id);
-    if (!pending) return;
-    clearTimeout(pending.timer); this.pending.delete(message.id);
-    if (message.error) pending.reject(new Error(message.error.message ?? "MCP error")); else pending.resolve(message.result);
-  }
-  #rejectAll(error) { for (const pending of this.pending.values()) pending.reject(error); this.pending.clear(); }
-}
-
-class HttpClient {
-  constructor(config) { this.config = config; this.sequence = 0; }
-  async initialize() {
-    await this.request("initialize", {
-      protocolVersion: "2025-03-26",
-      capabilities: {},
-      clientInfo: { name: "webcat", version: "1.1.0" }
-    });
-  }
-  async request(method, params) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.config.timeoutMs ?? 60_000);
-    try {
-      const response = await fetch(this.config.url, {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...(this.config.headers ?? {}) },
-        body: JSON.stringify({ jsonrpc: "2.0", id: ++this.sequence, method, params }),
-        signal: controller.signal
-      });
-      if (!response.ok) throw new Error(`MCP HTTP ${response.status}`);
-      const contentType = response.headers.get("content-type") ?? "";
-      const text = await response.text();
-      const payload = contentType.includes("text/event-stream") ? parseSse(text) : JSON.parse(text);
-      if (payload.error) throw new Error(payload.error.message ?? "MCP error");
-      return payload.result;
-    } finally { clearTimeout(timer); }
-  }
-  async close() {}
-}
-
-function parseSse(text) {
-  const data = text.split(/\r?\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).filter(Boolean).at(-1);
-  if (!data) throw new Error("MCP SSE response did not contain data");
-  return JSON.parse(data);
-}
-
-function filterOutOfScope(value, engagement) {
-  if (Array.isArray(value)) return value.map((entry) => filterOutOfScope(entry, engagement)).filter((entry) => entry !== undefined);
-  if (value && typeof value === "object") {
-    const target = extractTarget(value);
-    if (target && !evaluateScope(engagement, target, "passive").allowed) return undefined;
-    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, filterOutOfScope(entry, engagement)]).filter(([, entry]) => entry !== undefined));
-  }
-  return value;
-}
-
-function walk(value, visitor, key = "") {
-  if (Array.isArray(value)) return value.forEach((entry) => walk(entry, visitor, key));
-  if (value && typeof value === "object") return Object.entries(value).forEach(([childKey, entry]) => { visitor(childKey, entry); walk(entry, visitor, childKey); });
-  visitor(key, value);
+async function permitsEveryTarget(approvals, input, now) {
+  const targets = input.targets.length ? input.targets : ["*"];
+  for (const target of targets) if (!await approvals.permits({ risk: input.risk, server: input.server, tool: input.tool, target }, now)) return false;
+  return true;
 }
