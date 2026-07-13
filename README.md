@@ -2,63 +2,59 @@
 
 WebCat is a terminal-native AI swarm runtime for **authorized web application security assessment**.
 
-It coordinates isolated security-specialist agents, connects to external security tooling through the Model Context Protocol (MCP), enforces engagement authorization and scope before tool execution, stores redacted evidence, validates candidate findings, and produces Markdown or JSON reports.
+It coordinates isolated specialist profiles, connects to external security tooling through the Model Context Protocol (MCP), enforces authorization and scope before tool execution, stores redacted evidence, validates candidate findings, and produces Markdown or JSON reports.
 
-WebCat does **not** include a browser dashboard, an exploit library, an autonomous internet scanner, or a bundled interception proxy. Network activity is performed only through MCP servers that you configure.
+WebCat does not bundle an interception proxy, exploit library, browser dashboard, or autonomous internet scanner. Network operations are performed only through MCP servers that the operator configures.
 
 ## Project status
 
-WebCat 1.1 is an early, functional CLI/TUI release intended for controlled testing and further development.
+WebCat 1.1 is an early functional CLI/TUI release for controlled testing and continued development.
 
-Implemented areas include:
+Implemented capabilities include:
 
-- CLI and interactive terminal interface
-- engagement initialization and diagnostics
-- explicit authorization-window validation
-- allow and deny scope rules with deny precedence
-- observe, manual, and authorized-auto operating modes
-- expiring operator approvals
-- generic MCP support over stdio and HTTP/SSE
-- MCP tool discovery, allowlists, denylists, timeouts, and environment interpolation
-- conservative MCP capability and risk classification
-- bounded parallel specialist-agent execution
-- hypotheses, candidate findings, validator review, and critic review
-- secret-redacted evidence with integrity hashes
-- serialized hash-chained audit records
-- resumable sessions
-- Markdown and JSON reports
-- Linux, macOS, and Windows runtime-path handling
-- release, relocation, branding, logging, MCP, and scope regression tests
+- explicit authorization-window and deny-first scope enforcement;
+- observe, manual, and authorized-auto modes;
+- expiring operator approvals and rate/concurrency limits;
+- generic MCP over stdio, streamable HTTP, and legacy SSE;
+- native Burp MCP presets and adapters for three server families;
+- Caido and custom MCP configuration;
+- bounded model-driven MCP tool calls through the policy gateway;
+- specialist workflows for passive analysis, authentication, access control, server-side behavior, APIs, business logic, validation, and reporting;
+- redacted evidence with SHA-256 integrity;
+- serialized hash-chained audit records;
+- resumable sessions, hypotheses, candidate findings, validator/critic gates, and reports;
+- Linux, macOS, and Windows runtime paths;
+- release, relocation, branding, logging, MCP, scope, and Burp regression tests.
 
 This project is not a replacement for an experienced penetration tester. Operators must review scope, requests, evidence, and findings.
 
-## Safety and authorization
+## Safety boundary
 
 Use WebCat only against systems for which you have explicit permission to test.
 
-Before any external operation is executed, WebCat evaluates:
+Before an external operation executes, WebCat checks:
 
-1. the engagement authorization window;
+1. the written authorization window;
 2. explicit deny rules;
 3. explicit allow rules;
-4. the requested operation risk;
-5. the selected engagement mode;
+4. the operation risk;
+5. engagement mode;
 6. high-risk and destructive-operation policy;
 7. operator approval requirements;
-8. rate and parallelism limits.
+8. request-rate and parallel limits.
 
-Active MCP tools must have a trusted explicit capability mapping and an extractable absolute target URL. Out-of-scope requests are blocked before transport execution.
+Active MCP tools require a trusted capability mapping and an extractable in-scope target. Multi-target calls are rejected when any target is outside scope. A model cannot approve its own operation, change scope, enable a disabled tool, or bypass a policy rejection.
 
 ## Requirements
 
 - Node.js 22 or later
 - npm 10 or later
 - Optional: an OpenAI-compatible chat-completions endpoint
-- Optional: one or more MCP servers for proxy, browser, scanner, replay, sitemap, or workflow operations
+- Optional: one or more MCP servers such as Burp Suite, Caido, browser tooling, or a custom security adapter
 
 The application has no runtime npm dependencies.
 
-## Installation from source
+## Install from source
 
 ```bash
 git clone https://github.com/ChathurangaBW/WebCat.git
@@ -68,24 +64,24 @@ npm run qa
 npm link
 ```
 
-Verify the installed command:
+Verify the command:
 
 ```bash
 webcat --version
 webcat --help
 ```
 
-You can also run WebCat without linking it globally:
+Run without global linking:
 
 ```bash
 node bin/webcat.mjs --help
 ```
 
-For reproducible CI installation, use `npm ci` instead of `npm install`.
+Use `npm ci` for reproducible CI installation.
 
-## Quick start without a model or MCP server
+## Quick start
 
-The generated configuration uses the deterministic `mock` model provider, so the basic workflow can be tested without API credentials or external tools.
+Create an engagement workspace:
 
 ```bash
 mkdir authorized-assessment
@@ -94,26 +90,6 @@ webcat init
 webcat doctor
 webcat paths
 ```
-
-Edit the generated engagement file before running a real assessment:
-
-```text
-.webcat/engagement.json
-```
-
-The generated file contains placeholder authorization values and cannot authorize external operations until they are replaced with valid engagement information.
-
-Run a local mock session:
-
-```bash
-webcat run --objective "Review the configured authorized scope and produce a test assessment summary"
-webcat sessions list
-webcat audit verify
-webcat evidence verify
-webcat report --format markdown
-```
-
-## Project configuration
 
 `webcat init` creates:
 
@@ -124,11 +100,21 @@ webcat report --format markdown
 └── mcp.json
 ```
 
-### `config.toml`
+The generated model provider is `mock`, so a local workflow can run without credentials. The generated engagement contains authorization placeholders and must be edited before any real external operation.
 
-Controls the model provider, swarm limits, logging, and evidence limits.
+```bash
+webcat run --objective "Review the configured authorized scope and produce a test assessment summary"
+webcat sessions list
+webcat audit verify
+webcat evidence verify
+webcat report --format markdown
+```
 
-Default development configuration:
+## Configuration
+
+### `.webcat/config.toml`
+
+Controls the model provider, swarm limits, logging, and evidence size.
 
 ```toml
 [model]
@@ -150,97 +136,120 @@ level = "info"
 maxBodyBytes = 262144
 ```
 
-To use an OpenAI-compatible service, set the configured provider and endpoint, then export the environment variable named by `apiKeyEnv` when the endpoint requires authentication.
+To use an OpenAI-compatible service, set `provider = "openai-compatible"`, configure the endpoint/model, and export the environment variable named by `apiKeyEnv` when authentication is required.
 
-Never commit credentials to `config.toml` or `mcp.json`.
+Never commit credentials to WebCat configuration.
 
-### `engagement.json`
+### `.webcat/engagement.json`
 
-Defines:
+Defines engagement identity, authorization, mode, allow/deny rules, operation permissions, request limits, and high/destructive policy.
 
-- engagement ID and name
-- authorizer and authorization reference
-- authorization start and expiry times
-- operating mode
-- allow and deny scope rules
-- passive, active, high, and destructive operation permissions
-- request and concurrency limits
-- high-risk and destructive-action policy
-
-Check a URL before using it in an operation:
+Check targets before use:
 
 ```bash
 webcat scope-check https://app.example.test/api --operation passive
 webcat scope-check https://app.example.test/api --operation active --json
 ```
 
-### `mcp.json`
+### `.webcat/mcp.json`
 
-Defines MCP servers and tool policy.
-
-Supported transports:
-
-- stdio JSON-RPC
-- streamable HTTP JSON-RPC
-- SSE-formatted HTTP responses
-
-Supported controls include:
-
-- disabled servers
-- enabled-tool allowlists
-- disabled-tool denylists
-- per-server timeouts
-- environment-variable interpolation
-- header interpolation
-- explicit capability mappings
-
-Inspect configured MCP servers:
+Defines MCP servers, transports, interpolation, timeouts, tool filters, presets, and capability mappings.
 
 ```bash
 webcat mcp status
 webcat mcp tools
-webcat mcp tools caido
+webcat mcp tools <server> --json
 ```
 
-Call a configured tool:
+See [MCP integration](docs/MCP.md).
+
+## Burp Suite MCP support
+
+WebCat includes tested adapter presets for:
+
+| Preset | Implementation | Transport |
+|---|---|---|
+| `portswigger-sse` | Official PortSwigger MCP extension | legacy SSE |
+| `portswigger-stdio` | Official extension through packaged proxy | stdio |
+| `swgee-sse` | BurpMCP extension | legacy SSE |
+| `bridge-stdio` | Burp MCP Bridge | stdio |
+| `bridge-http` | Burp MCP Bridge | streamable HTTP |
+
+Inspect them:
 
 ```bash
-webcat mcp call caido list_requests --args '{}'
+webcat burp presets
+webcat burp skills
+webcat burp status
 ```
 
-Example active call requiring a target and applicable approval:
+Enable the official extension in `.webcat/mcp.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "servers": {
+    "burp": {
+      "preset": "portswigger-sse",
+      "enabled": true
+    }
+  }
+}
+```
+
+Then verify initialization and tool discovery:
 
 ```bash
-webcat mcp call caido send_request \
-  --args '{"url":"https://app.example.test/api/profile"}' \
+webcat burp doctor burp
+webcat burp tools burp
+```
+
+A controlled official HTTP/1.1 call:
+
+```bash
+webcat mcp call burp send_http1_request \
+  --args '{
+    "content":"GET /account HTTP/1.1\r\nHost: app.example.test\r\n\r\n",
+    "targetHostname":"app.example.test",
+    "targetPort":443,
+    "usesHttps":true
+  }' \
   --approve
 ```
 
-The exact MCP tool names depend on the connected server.
+WebCat derives the target URL and applies scope, mode, risk, approval, rate, evidence, and audit controls before transport execution.
 
-## Operating modes
+Configuration writes, intercept changes, task-engine changes, Intruder/scanner operations, broad interceptors, utility/shell execution, and other high-impact tool families are disabled by default where applicable.
 
-| Mode | Behaviour |
-|---|---|
-| `observe` | Permits passive/read-only operations only. |
-| `manual` | Active operations require an applicable operator approval. |
-| `authorized-auto` | In-scope active operations may execute automatically; high-risk and destructive operations remain separately controlled. |
+Built-in Burp workflow guidance includes passive traffic review, authentication-flow mapping, access-control comparison, session-scope review, SSRF/redirect hypotheses using approved destinations, business-logic review, bounded rate-limit review, and evidence-based reporting.
 
-Grant a temporary approval:
+See [Burp Suite MCP integration](docs/BURP.md) for all presets, setup variants, policy hints, exact safety behavior, and troubleshooting.
+
+## Model-driven MCP tools
+
+With an OpenAI-compatible provider, each specialist receives only discovered MCP tools whose trusted capability matches its profile. The model may request tool calls, but execution remains inside the deterministic MCP guard.
+
+Tool use is bounded by `maxAgentTurns` and `maxToolCallsPerAgent`. In `manual` mode, create a stored approval before a model-driven active operation:
 
 ```bash
 webcat approvals grant \
   --risk active \
+  --server burp \
+  --tool send_http1_request \
+  --target 'https://app.example.test/**' \
   --ttl 20 \
-  --reason "Controlled authorization validation"
+  --reason 'Controlled authorization validation'
 ```
 
-List or revoke approvals:
+Policy errors are returned to the model as final safety decisions, not invitations to retry around controls.
 
-```bash
-webcat approvals list
-webcat approvals revoke <approval-id>
-```
+## Operating modes
+
+| Mode | Behavior |
+|---|---|
+| `observe` | Passive/read-only MCP operations only. |
+| `manual` | Active operations require a matching operator approval. |
+| `authorized-auto` | In-scope active operations may run automatically; high and destructive operations remain separately gated. |
 
 ## Main commands
 
@@ -252,6 +261,8 @@ webcat scope-check <url> [--operation passive|active|high|destructive] [--json]
 webcat profiles [--json]
 webcat mcp status|tools [server] [--json]
 webcat mcp call <server> <tool> --args '<json>' [--approve]
+webcat burp status|doctor|tools [server] [--json]
+webcat burp presets|skills [--json]
 webcat approvals list|grant|revoke
 webcat run --objective "Authorized assessment objective" [--json]
 webcat resume [session-id] [--json]
@@ -264,80 +275,29 @@ webcat report [session-id] [--format markdown|json]
 webcat tui
 ```
 
-Run `webcat --help` for the current command surface.
+## Evidence and reporting
 
-## Agent workflow
-
-A session follows a gated workflow:
-
-```text
-authorization and scope validation
-        ↓
-MCP discovery
-        ↓
-parallel specialist analysis
-        ↓
-hypotheses and candidate findings
-        ↓
-independent validation
-        ↓
-security critic review
-        ↓
-evidence, audit, and reporting
-```
-
-Candidate findings are not treated as validated findings until they pass the validator and critic stages.
-
-## Evidence, audit, and reports
-
-Project runtime records are stored under `.webcat` and are excluded from version control.
-
-WebCat provides:
-
-- secret and credential redaction before persistence
-- SHA-256 evidence integrity verification
-- serialized hash-chained audit entries
-- session-scoped hypotheses and findings
-- Markdown and JSON reports
-
-Useful commands:
+WebCat provides common secret redaction, SHA-256 evidence integrity, hash-chained audit entries, session-scoped hypotheses/findings, validator/critic gates, and Markdown/JSON reports.
 
 ```bash
-webcat evidence list
 webcat evidence verify
-webcat audit list
 webcat audit verify
 webcat findings list
 webcat hypotheses list
 webcat report --format markdown
-webcat report --format json
 ```
 
-## User runtime paths
+Candidate findings are not promoted without evidence IDs, reproduction detail, sufficient confidence, and critic review.
 
-WebCat does not depend on the parent directory name of the repository.
+## Runtime paths
 
-Default user paths are platform-specific:
-
-- Linux: XDG configuration, state, cache, and data directories under `webcat`
+- Linux: XDG directories under `webcat`
 - macOS: `~/Library/Application Support/WebCat`, `~/Library/Caches/WebCat`, and `~/Library/Logs/WebCat`
 - Windows: `%APPDATA%\WebCat` and `%LOCALAPPDATA%\WebCat`
 
-Overrides:
+Overrides: `WEBCAT_HOME`, `WEBCAT_CONFIG_HOME`, `WEBCAT_LOG_LEVEL`, `WEBCAT_LOG_FILE`, and `WEBCAT_DISABLE_UPDATE_CHECK`.
 
-- `WEBCAT_HOME`
-- `WEBCAT_CONFIG_HOME`
-- `WEBCAT_LOG_LEVEL`
-- `WEBCAT_LOG_FILE`
-- `WEBCAT_DISABLE_UPDATE_CHECK`
-
-The default log file is `webcat.log`. Authorization headers, cookies, token-like fields, passwords, and configured secrets are redacted before logging.
-
-Display the paths selected for the current environment:
-
-```bash
-webcat paths
-```
+The default log is `webcat.log`. Common credentials and token-like fields are redacted before logging.
 
 ## Development and QA
 
@@ -355,39 +315,22 @@ npm run qa
 npm pack --dry-run
 ```
 
-`npm run qa` executes the normal release gate, including unit tests, production build, integration smoke tests, relocation/global-install regression tests, repository branding verification, and built-output verification.
-
 GitHub Actions runs the same QA gate for pull requests and pushes to `main`.
-
-## Repository layout
-
-```text
-WebCat/
-├── .github/workflows/     CI
-├── .webcat/               configuration examples
-├── bin/                   executable entry point
-├── docs/                  architecture and operator documentation
-├── scripts/               build, QA, smoke, and verification scripts
-├── src/                   runtime modules
-├── test/                  unit and regression tests
-├── package.json
-└── README.md
-```
 
 ## Current limitations
 
-- MCP compatibility can vary between server implementations.
-- Active MCP tools require explicit trusted capability mappings.
-- The built-in model integration expects an OpenAI-compatible chat-completions interface.
+- Burp MCP implementations evolve independently; inspect discovered tools after upgrades.
+- Model-driven MCP use requires an OpenAI-compatible chat-completions endpoint with tool-call support.
 - The TUI is a command-oriented terminal loop, not a full-screen graphical terminal application.
-- Findings produced by an AI model require human verification.
-- WebCat does not establish legal authorization; the operator is responsible for obtaining and correctly configuring it.
+- Findings generated by a model require human verification.
+- WebCat does not establish legal authorization; the operator must obtain and configure it correctly.
 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Configuration](docs/CONFIGURATION.md)
 - [MCP integration](docs/MCP.md)
+- [Burp Suite MCP integration](docs/BURP.md)
 - [Security model](docs/SECURITY_MODEL.md)
 - [Release QA](docs/RELEASE_QA.md)
 - [Security policy](SECURITY.md)
