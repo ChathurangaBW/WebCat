@@ -78,7 +78,6 @@ export async function reportCommand(args, context) {
   console.log(path); return 0;
 }
 
-
 export async function createRuntime(context) {
   const paths = projectPaths(context.cwd);
   const [config, engagement, mcpConfig] = await Promise.all([
@@ -138,9 +137,10 @@ export function mcpTemplate() {
           run_workflow: { capability: "scanner.run", risk: "high", requiresTarget: true }
         }
       },
-      burp: { transport: "http", url: "http://127.0.0.1:9876/mcp", enabled: false, timeoutMs: 60000 },
+      burp: { preset: "portswigger-sse", enabled: false },
+      burpmcp: { preset: "swgee-sse", enabled: false },
+      burp_bridge: { preset: "bridge-stdio", enabled: false },
       generic_sse: { transport: "sse", url: "http://127.0.0.1:9000/mcp", enabled: false, timeoutMs: 60000 }
     }
   };
 }
-
