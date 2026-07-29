@@ -9,7 +9,7 @@ import { evaluateScope } from "../src/scope.mjs";
 import { ApprovalStore } from "../src/approvals.mjs";
 import { AuditLog } from "../src/audit.mjs";
 import { EvidenceStore } from "../src/evidence.mjs";
-import { redactText } from "../src/redact.mjs";
+import { redact, redactText } from "../src/redact.mjs";
 import { loadEngagement, loadMcpConfig } from "../src/config.mjs";
 import { assertKnownOptions, flag, tokenize } from "../src/cli-utils.mjs";
 
@@ -215,6 +215,27 @@ test("raw HTTP secrets are redacted while benign headers survive", () => {
   assert.match(output, /Host: app\.example\.test/);
   assert.match(output, /User-Agent: Mozilla/);
   assert.equal(redactText("https://x.test/cb?access_token=SECRET123").includes("SECRET123"), false);
+});
+
+// M4 (follow-up) -- MCP servers return payloads as { content: [{ type: "text", text: "<json>" }] },
+// so secrets arrive inside a JSON-encoded string where neither key-based redaction nor the raw
+// header-line pattern can see them. Found during release QA against a live stdio MCP server.
+test("secrets inside JSON-encoded MCP payloads are redacted", () => {
+  const inner = JSON.stringify({ headers: { "set-cookie": "session=SUPERSECRET" }, body: "hello", status: 200 });
+  const output = JSON.stringify(redact({ content: [{ type: "text", text: inner }] }));
+  assert.equal(output.includes("SUPERSECRET"), false, "cookie inside a JSON string payload must be redacted");
+  assert.ok(output.includes("hello"), "non-sensitive body must survive");
+  assert.ok(output.includes("200"), "non-sensitive status must survive");
+
+  // Both the plain and backslash-escaped encodings, terminating at the correct quote.
+  assert.equal(redactText(`{"set-cookie":"session=SECRET","status":200}`).includes("SECRET"), false);
+  assert.ok(redactText(`{"set-cookie":"session=SECRET","status":200}`).includes("200"));
+  const escaped = redactText(String.raw`{\"set-cookie\":\"session=SUPERSECRET\",\"body\":\"hello\"}`);
+  assert.equal(escaped.includes("SUPERSECRET"), false);
+  assert.ok(escaped.includes("hello"), "redaction must stop at the value boundary");
+  assert.equal(redactText(`{"authorization":"Basic dXNlcjpwYXNz"}`).includes("dXNlcjpwYXNz"), false);
+  // Benign JSON must be left alone.
+  assert.equal(redactText(`{"status":200,"content-type":"application/json"}`), `{"status":200,"content-type":"application/json"}`);
 });
 
 // M5 -- one out-of-scope URL must not delete the in-scope evidence around it.

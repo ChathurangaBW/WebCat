@@ -30,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   patterns, but proxy tools return whole request/response strings, where `Cookie:`,
   `Authorization: Basic`, and bare JWTs were all written to evidence and audit files in
   plaintext. Header-line, auth-scheme, and JWT patterns have been added.
+- **Secrets inside JSON-encoded MCP payloads are redacted.** Found during release QA against a
+  live stdio MCP server: servers commonly return results as
+  `{ content: [{ type: "text", text: "<json>" }] }`, so a `set-cookie` value sits inside a
+  JSON-encoded *string* where neither key-based redaction nor the raw header-line pattern could
+  reach it, and the session cookie was written to the evidence store in plaintext. Both the
+  plain (`"key":"value"`) and backslash-escaped (`\"key\":\"value\"`) encodings are now
+  matched, terminating at the correct value boundary so surrounding data is preserved.
 - **Every refusal class is audited.** Only scope failures produced an `mcp.blocked` record.
   Untrusted-tool, missing-target, approval, and concurrency refusals are now recorded on the
   hash chain with a `control` field before the error is raised.

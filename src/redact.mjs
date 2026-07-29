@@ -24,7 +24,14 @@ const INLINE_PATTERNS = [
   // Bare JWTs anywhere in a body or fragment of text.
   /\beyJ[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}\.[a-z0-9_-]+/gi,
   /((?:api[_-]?key|token|password|passwd|secret|session[_-]?id)\s*[=:]\s*)[^\s,;&"']+/gi,
-  /([?&](?:token|api_key|apikey|access_token|refresh_token|id_token|key|session|sig|signature)=)[^&#\s]+/gi
+  /([?&](?:token|api_key|apikey|access_token|refresh_token|id_token|key|session|sig|signature)=)[^&#\s]+/gi,
+  // Sensitive fields inside a JSON string. MCP servers commonly return payloads as
+  // { content: [{ type: "text", text: "<json>" }] }, so the real response is a JSON-encoded
+  // string: neither key-based redaction nor the header-line pattern above can see it.
+  // Backslash-escaped encoding (\"key\":\"value\"), terminating at the escaped closing quote.
+  /(\\"(?:set-cookie|cookie|authorization|proxy-authorization|x-api-key|api[_-]?key|apikey|password|passwd|secret|client_secret|token|access_token|refresh_token|id_token|session[_-]?id)\\"\s*:\s*\\")(?:(?!\\").)*/gi,
+  // Plain encoding ("key":"value"), terminating at the first unescaped quote.
+  /(["'](?:set-cookie|cookie|authorization|proxy-authorization|x-api-key|api[_-]?key|apikey|password|passwd|secret|client_secret|token|access_token|refresh_token|id_token|session[_-]?id)["']\s*:\s*["'])(?:[^"'\\]|\\.)*/gi
 ];
 
 // Patterns whose match has no capture group to preserve are replaced wholesale.
