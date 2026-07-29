@@ -59,7 +59,7 @@ Usage:
   webcat paths [--json]
   webcat scope-check <url> [--operation passive|active|high|destructive] [--json]
   webcat profiles [--json]
-  webcat mcp status|tools [server] [--json]
+  webcat mcp status|tools|refresh [server] [--json]
   webcat mcp call <server> <tool> --args '{"url":"https://target"}' [--approve]
   webcat burp status|doctor|tools [server] [--json]
   webcat burp presets|skills [--json]
@@ -93,8 +93,22 @@ async function tuiCommand(context) {
   process.stdout.write(`\u001b]0;${IDENTITY.productName}\u0007`);
   console.log(`\n${banner()}\nType /help for commands and /exit to close.\n`);
   try {
-    while (true) {
-      const line = (await terminal.question("webcat> ")).trim();
+    // On EOF (closed or piped stdin) question() never settles, which would otherwise leave the
+    // process hanging on an unsettled top-level await. Race it against the close event so the
+    // TUI exits cleanly instead.
+    let closed = false;
+    terminal.once("close", () => { closed = true; });
+    const endOfInput = Symbol("end-of-input");
+    const nextLine = () => Promise.race([
+      terminal.question("webcat> "),
+      new Promise((resolve) => terminal.once("close", () => resolve(endOfInput)))
+    ]);
+    while (!closed) {
+      let line;
+      try { line = await nextLine(); }
+      catch { break; }
+      if (line === endOfInput) { console.log(); break; }
+      line = String(line).trim();
       if (!line) continue;
       if (["/exit", "/quit"].includes(line)) break;
       const tokens = tokenize(line.startsWith("/") ? line.slice(1) : `run --objective ${JSON.stringify(line)}`);

@@ -43,14 +43,50 @@ export function stripPolicyMetadata(value) {
   return Object.fromEntries(Object.entries(value).filter(([key]) => key !== POLICY_KEY).map(([key, entry]) => [key, stripPolicyMetadata(entry)]));
 }
 
+// Prunes only the smallest subtree that actually references an out-of-scope target, and records
+// how many were removed. A single third-party URL (CDN, analytics, fonts) in a proxy-history
+// result must not collapse the whole response and leave the agent silently reasoning about
+// nothing. The count is surfaced so the omission is visible rather than invisible.
 export function filterOutOfScope(value, engagement) {
-  if (Array.isArray(value)) return value.map((entry) => filterOutOfScope(entry, engagement)).filter((entry) => entry !== undefined);
+  const stats = { removed: 0 };
+  const filtered = prune(value, engagement, stats, true);
+  if (stats.removed === 0) return filtered;
+  const marker = { filteredOutOfScope: stats.removed };
+  if (Array.isArray(filtered)) return Object.assign(filtered, marker);
+  if (filtered && typeof filtered === "object") return { ...filtered, ...marker };
+  return { value: filtered, ...marker };
+}
+
+function prune(value, engagement, stats, isRoot = false) {
+  if (Array.isArray(value)) {
+    const output = [];
+    for (const entry of value) {
+      const child = prune(entry, engagement, stats);
+      if (child !== undefined) output.push(child);
+    }
+    return output;
+  }
   if (value && typeof value === "object") {
-    const targets = extractTargets(value);
-    if (targets.some((target) => !evaluateScope(engagement, target, "passive").allowed)) return undefined;
-    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, filterOutOfScope(entry, engagement)]).filter(([, entry]) => entry !== undefined));
+    // Only the targets named directly on this node decide this node's fate; nested nodes are
+    // judged on their own so a bad leaf does not condemn its in-scope siblings or ancestors.
+    if (!isRoot && hasOutOfScopeOwnTarget(value, engagement)) { stats.removed += 1; return undefined; }
+    const output = {};
+    for (const [key, entry] of Object.entries(value)) {
+      const child = prune(entry, engagement, stats);
+      if (child !== undefined) output[key] = child;
+    }
+    return output;
   }
   return value;
+}
+
+function hasOutOfScopeOwnTarget(node, engagement) {
+  const shallow = {};
+  for (const [key, entry] of Object.entries(node)) {
+    if (entry === null || typeof entry !== "object") shallow[key] = entry;
+  }
+  const targets = extractTargets(shallow);
+  return targets.length > 0 && targets.some((target) => !evaluateScope(engagement, target, "passive").allowed);
 }
 
 export const policyHintName = POLICY_KEY;

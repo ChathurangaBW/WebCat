@@ -7,9 +7,10 @@ import { McpGuard, McpManager } from "./mcp.mjs";
 import { SwarmOrchestrator, createProvider } from "./swarm.mjs";
 import { RecordStore, SessionStore } from "./store.mjs";
 import { writeReport } from "./report.mjs";
-import { flag, positionals, printJson, printTable } from "./cli-utils.mjs";
+import { assertKnownOptions, flag, positionals, printJson, printTable } from "./cli-utils.mjs";
 
 export async function runCommand(args, context) {
+  assertKnownOptions(args, ["--objective"]);
   const objective = flag(args, "--objective");
   if (!objective) throw new Error("run requires --objective");
   const runtime = await createRuntime(context);
@@ -64,6 +65,7 @@ export async function auditCommand(args, context) {
 }
 
 export async function reportCommand(args, context) {
+  assertKnownOptions(args, ["--format"]);
   const [sessionId] = positionals(args, ["--format"]);
   const format = flag(args, "--format") ?? "markdown";
   if (!["markdown", "json"].includes(format)) throw new Error("Report format must be markdown or json");

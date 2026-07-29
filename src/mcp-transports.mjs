@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+import { IDENTITY } from "./identity.mjs";
 
 export function createMcpClient(config) {
   if (config.transport === "stdio") return new StdioClient(config);
@@ -148,7 +149,7 @@ function initializeParams(config) {
   return {
     protocolVersion: config.protocolVersion ?? "2025-03-26",
     capabilities: {},
-    clientInfo: { name: "webcat", version: "1.1.0" }
+    clientInfo: { name: IDENTITY.command, version: IDENTITY.version }
   };
 }
 

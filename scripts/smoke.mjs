@@ -24,6 +24,14 @@ try {
   run([cli, "audit", "verify"], project, env);
   run([cli, "evidence", "verify"], project, env);
   run([cli, "report", "--format", "markdown"], project, env);
+
+  // The product's core promise is refusal, so the happy path alone is not a sufficient gate.
+  expectFailure([cli, "scope-check", "https://not-authorized.example/", "--operation", "passive"], project, env, "out-of-scope target");
+  expectFailure([cli, "scope-check", "https://app.example.test/health", "--operation", "active"], project, env, "active operation in observe mode");
+  expectFailure([cli, "scope-check", "https://app.example.test/health", "--oepration", "passive"], project, env, "mistyped option");
+  // The '=' form must be honoured rather than silently ignored and evaluated as passive.
+  expectFailure([cli, "scope-check", "https://app.example.test/health", "--operation=active"], project, env, "active operation via --operation=");
+  run([cli, "audit", "verify"], project, env);
   const log = await readFile(join(home, "state", "logs", "webcat.log"), "utf8");
   if (!log.includes('"product":"WebCat"')) throw new Error("Smoke log did not contain WebCat identity");
   console.log("Smoke workflow passed.");
@@ -35,4 +43,10 @@ function run(args, cwd, env) {
   const result = spawnSync(process.execPath, args, { cwd, env, encoding: "utf8" });
   if (result.status !== 0) throw new Error(`Command failed: node ${args.join(" ")}\n${result.stdout}\n${result.stderr}`);
   return result.stdout;
+}
+
+function expectFailure(args, cwd, env, label) {
+  const result = spawnSync(process.execPath, args, { cwd, env, encoding: "utf8" });
+  if (result.status === 0) throw new Error(`Expected refusal for ${label}, but the command succeeded:\n${result.stdout}`);
+  return result;
 }

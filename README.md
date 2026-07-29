@@ -43,6 +43,11 @@ Before an external operation executes, WebCat checks:
 7. operator approval requirements;
 8. request-rate and parallel limits.
 
+Allow rules must name at least one host and are rejected at load time if malformed, so a
+mistyped rule can never silently widen authorization. Unmapped MCP tools default to the
+`active` risk class, and a server-supplied tool description can only raise an assessed risk
+level, never lower it.
+
 Active MCP tools require a trusted capability mapping and an extractable in-scope target. Multi-target calls are rejected when any target is outside scope. A model cannot approve its own operation, change scope, enable a disabled tool, or bypass a policy rejection.
 
 ## Requirements
@@ -241,6 +246,11 @@ webcat approvals grant \
   --reason 'Controlled authorization validation'
 ```
 
+Approval targets use the same glob vocabulary as engagement paths: `*` matches within a single
+path segment and `**` matches across segments, so `https://app.example.test/**` covers the whole
+host. An approval never widens scope; it only satisfies the approval requirement for an
+operation that is already in scope.
+
 Policy errors are returned to the model as final safety decisions, not invitations to retry around controls.
 
 ## Operating modes
@@ -315,7 +325,13 @@ npm run qa
 npm pack --dry-run
 ```
 
-GitHub Actions runs the same QA gate for pull requests and pushes to `main`.
+`npm run lint` performs dependency-free static checks (syntax, floating promises on audit and
+evidence calls, stray debug output); `npm run typecheck` verifies module contracts rather than
+performing full static type analysis. `npm run test:coverage` enforces a coverage floor.
+
+GitHub Actions runs the same QA gate for pull requests and pushes to `main`. An expanded
+workflow that runs the gate across Linux, macOS, and Windows on Node 22 and 24 and adds CodeQL
+analysis is staged in [`docs/ci/`](docs/ci/README.md) for a maintainer to apply.
 
 ## Current limitations
 

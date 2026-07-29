@@ -1,34 +1,45 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { redact } from "./redact.mjs";
 
 export class AuditLog {
   #queue = Promise.resolve();
+  #head;
   constructor(path) { this.path = path; }
 
   append(event, actor, data = {}) {
-    this.#queue = this.#queue.then(() => this.#append(event, actor, data));
-    return this.#queue;
+    // Serialize appends, but never let one failure poison the queue for later callers.
+    const result = this.#queue.then(() => this.#append(event, actor, data));
+    this.#queue = result.catch(() => undefined);
+    return result;
   }
 
+  // The chain head is cached after the first read so that appends stay O(1): each record is
+  // appended as a single line instead of rewriting the whole file, which also means a crash
+  // or a full disk can cost at most the record being written rather than the entire chain.
   async #append(event, actor, data) {
-    const entries = await this.read();
-    const previousHash = entries.at(-1)?.hash ?? "0".repeat(64);
+    if (!this.#head) this.#head = await this.#readHead();
     const core = {
       id: `audit_${randomUUID()}`,
-      sequence: entries.length + 1,
+      sequence: this.#head.sequence + 1,
       time: new Date().toISOString(),
       event,
       actor,
       data: redact(data),
-      previousHash
+      previousHash: this.#head.hash
     };
     const entry = { ...core, hash: digest(core) };
-    entries.push(entry);
     await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
-    await writeFile(this.path, `${entries.map((item) => JSON.stringify(item)).join("\n")}\n`, { mode: 0o600 });
+    await appendFile(this.path, `${JSON.stringify(entry)}\n`, { mode: 0o600 });
+    this.#head = { sequence: entry.sequence, hash: entry.hash };
     return entry;
+  }
+
+  async #readHead() {
+    const entries = await this.read();
+    const last = entries.at(-1);
+    return { sequence: last?.sequence ?? 0, hash: last?.hash ?? "0".repeat(64) };
   }
 
   async read() {

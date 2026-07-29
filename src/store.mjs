@@ -59,10 +59,10 @@ export class SessionStore {
     return record;
   }
   async write(session) {
-    session.updatedAt = new Date().toISOString();
+    const record = { ...session, updatedAt: new Date().toISOString() };
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
-    await writeFile(join(this.directory, `${session.id}.json`), `${JSON.stringify(session, null, 2)}\n`, { mode: 0o600 });
-    return session;
+    await writeFile(join(this.directory, `${record.id}.json`), `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 });
+    return record;
   }
   async get(id) {
     try { return JSON.parse(await readFile(join(this.directory, `${id}.json`), "utf8")); }

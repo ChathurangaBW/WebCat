@@ -61,8 +61,18 @@ export class ApprovalStore {
   }
 }
 
+// Approval targets use the same glob vocabulary as engagement allow/deny paths, so an operator
+// can paste the documented 'https://app.example.test/**' form and have it behave as written:
+// '*' matches within a single path segment, '**' matches across segments.
 function wildcard(pattern, value) {
-  if (pattern === "*") return true;
-  if (pattern.endsWith("*")) return String(value).startsWith(pattern.slice(0, -1));
-  return pattern === value;
+  const source = String(pattern);
+  if (source === "*" || source === "**") return true;
+  const actual = String(value);
+  if (!/[*]/.test(source)) return source === actual;
+  const escaped = source
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*/g, "\u0000")
+    .replace(/\*/g, "[^/]*")
+    .replace(/\u0000/g, ".*");
+  return new RegExp(`^${escaped}$`).test(actual);
 }

@@ -16,10 +16,19 @@ const SENSITIVE_KEYS = new Set([
 ]);
 
 const INLINE_PATTERNS = [
-  /(bearer\s+)[a-z0-9._~+\/-]+=*/gi,
-  /((?:api[_-]?key|token|password|secret)\s*[=:]\s*)[^\s,;]+/gi,
-  /([?&](?:token|api_key|access_token|key)=)[^&#\s]+/gi
+  // Raw HTTP header lines. Burp and other proxies hand back whole request/response strings,
+  // so key-based object redaction never sees these.
+  /^([ \t]*(?:cookie|set-cookie|authorization|proxy-authorization|x-api-key|api-key|x-auth-token|x-csrf-token|x-xsrf-token)[ \t]*:[ \t]*)[^\r\n]+/gim,
+  // Any auth scheme, not just Bearer.
+  /((?:bearer|basic|digest|negotiate|token)\s+)[a-z0-9._~+\/-]{8,}=*/gi,
+  // Bare JWTs anywhere in a body or fragment of text.
+  /\beyJ[a-z0-9_-]{8,}\.[a-z0-9_-]{8,}\.[a-z0-9_-]+/gi,
+  /((?:api[_-]?key|token|password|passwd|secret|session[_-]?id)\s*[=:]\s*)[^\s,;&"']+/gi,
+  /([?&](?:token|api_key|apikey|access_token|refresh_token|id_token|key|session|sig|signature)=)[^&#\s]+/gi
 ];
+
+// Patterns whose match has no capture group to preserve are replaced wholesale.
+const WHOLE_MATCH_PATTERNS = new Set([2]);
 
 export function redact(value, seen = new WeakSet()) {
   if (typeof value === "string") return redactText(value);
@@ -36,7 +45,9 @@ export function redact(value, seen = new WeakSet()) {
 
 export function redactText(input) {
   let output = String(input);
-  for (const pattern of INLINE_PATTERNS) output = output.replace(pattern, "$1[REDACTED]");
+  INLINE_PATTERNS.forEach((pattern, index) => {
+    output = output.replace(pattern, WHOLE_MATCH_PATTERNS.has(index) ? "[REDACTED]" : "$1[REDACTED]");
+  });
   return output;
 }
 

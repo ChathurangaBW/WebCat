@@ -40,8 +40,11 @@ export class EvidenceStore {
 }
 
 function truncate(value, maxBytes) {
-  const text = JSON.stringify(value);
+  const text = JSON.stringify(value) ?? "";
   if (Buffer.byteLength(text) <= maxBytes) return value;
-  return { truncated: true, preview: text.slice(0, Math.max(0, maxBytes - 100)) };
+  // Slice on a byte budget and drop any partial multi-byte character at the boundary.
+  const budget = Math.max(0, maxBytes - 100);
+  const preview = Buffer.from(text, "utf8").subarray(0, budget).toString("utf8").replace(/\uFFFD$/, "");
+  return { truncated: true, originalBytes: Buffer.byteLength(text), preview };
 }
 function digest(value) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }

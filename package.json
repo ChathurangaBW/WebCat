@@ -4,6 +4,23 @@
   "description": "Terminal-native AI swarm runtime for authorized web application security assessment",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChathurangaBW/WebCat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ChathurangaBW/WebCat/issues"
+  },
+  "homepage": "https://github.com/ChathurangaBW/WebCat#readme",
+  "keywords": [
+    "security",
+    "appsec",
+    "penetration-testing",
+    "mcp",
+    "burp",
+    "authorized-testing",
+    "cli"
+  ],
   "private": false,
   "bin": {
     "webcat": "bin/webcat.mjs"
@@ -15,7 +32,8 @@
     "README.md",
     "SECURITY.md",
     "THIRD_PARTY_NOTICES.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=22"
@@ -30,6 +48,7 @@
     "verify:branding": "node scripts/verify-webcat-branding.mjs",
     "verify:built": "node scripts/verify-webcat-branding.mjs --built-only",
     "smoke": "node scripts/smoke.mjs",
-    "qa": "npm run lint && npm run typecheck && npm test && npm run build && npm run test:integration && npm run test:relocation && npm run verify:branding && npm run verify:built"
+    "qa": "npm run lint && npm run typecheck && npm test && npm run test:coverage && npm run build && npm run test:integration && npm run test:relocation && npm run verify:branding && npm run verify:built",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=78 --test-coverage-branches=70 test/*.test.mjs"
   }
 }

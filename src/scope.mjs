@@ -19,9 +19,11 @@ export function evaluateScope(engagement, target, operation = "passive", now = n
   let url;
   try { url = new URL(target); }
   catch { return decision(false, "target", "Target must be an absolute URL"); }
-  const denied = engagement.deny.find((rule) => ruleMatches(rule, url, operation));
+  const denied = engagement.deny.find((rule) => ruleMatches(rule, url, operation, "deny"));
   if (denied) return decision(false, denied.id ?? "deny", "Target matches an explicit deny rule", url);
-  const allowed = engagement.allow.find((rule) => ruleMatches(rule, url, operation));
+  const malformed = engagement.allow.find((rule) => !isUsableAllowRule(rule));
+  if (malformed) return decision(false, malformed?.id ?? "allow", "Allow rule is malformed: hosts must be a non-empty array of host patterns", url);
+  const allowed = engagement.allow.find((rule) => ruleMatches(rule, url, operation, "allow"));
   if (!allowed) return decision(false, "allow", "Target is outside the authorized allow rules", url);
   if (operation !== "passive" && engagement.mode === "observe") return decision(false, "mode", "Observe mode blocks active operations", url);
   if (operation === "high" && !engagement.riskPolicy?.allowHighRisk) return decision(false, "risk", "High-risk operations are disabled", url);
@@ -29,16 +31,42 @@ export function evaluateScope(engagement, target, operation = "passive", now = n
   return decision(true, allowed.id ?? "allow", "Target is authorized", url);
 }
 
-function ruleMatches(rule, url, operation) {
-  if (Array.isArray(rule.operations) && !rule.operations.includes(operation)) return false;
-  if (Array.isArray(rule.schemes) && rule.schemes.length > 0 && !rule.schemes.includes(url.protocol.slice(0, -1))) return false;
-  if (Array.isArray(rule.ports) && rule.ports.length > 0) {
-    const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
-    if (!rule.ports.includes(port)) return false;
+export function isUsableAllowRule(rule) {
+  if (!rule || typeof rule !== "object" || Array.isArray(rule)) return false;
+  if (!isNonEmptyStringArray(rule.hosts)) return false;
+  for (const field of ["schemes", "paths", "operations"]) {
+    if (rule[field] !== undefined && !isNonEmptyStringArray(rule[field])) return false;
   }
-  if (Array.isArray(rule.hosts) && rule.hosts.length > 0 && !rule.hosts.some((pattern) => hostMatches(pattern, url.hostname))) return false;
-  if (Array.isArray(rule.paths) && rule.paths.length > 0 && !rule.paths.some((pattern) => pathMatches(pattern, url.pathname))) return false;
+  if (rule.ports !== undefined && !(Array.isArray(rule.ports) && rule.ports.length > 0 && rule.ports.every((port) => Number.isFinite(Number(port))))) return false;
   return true;
+}
+
+// An allow rule only widens authorization, so an absent or unusable constraint must never
+// be read as "matches everything". A deny rule only narrows it, so a present-but-malformed
+// constraint is treated as matching in order to fail closed.
+function ruleMatches(rule, url, operation, kind = "allow") {
+  const strict = kind === "allow";
+  if (strict && !isUsableAllowRule(rule)) return false;
+  if (rule.operations !== undefined && !(Array.isArray(rule.operations) ? rule.operations.includes(operation) : !strict)) return false;
+  if (!fieldMatches(rule.schemes, strict, (patterns) => patterns.includes(url.protocol.slice(0, -1)))) return false;
+  if (!fieldMatches(rule.ports, strict, (patterns) => {
+    const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
+    return patterns.map(Number).includes(port);
+  })) return false;
+  if (!fieldMatches(rule.hosts, strict, (patterns) => patterns.some((pattern) => hostMatches(pattern, url.hostname)), strict)) return false;
+  if (!fieldMatches(rule.paths, strict, (patterns) => patterns.some((pattern) => pathMatches(pattern, url.pathname)))) return false;
+  return true;
+}
+
+function fieldMatches(value, strict, predicate, required = false) {
+  if (value === undefined || value === null) return required ? false : true;
+  if (!Array.isArray(value)) return !strict;
+  if (value.length === 0) return required ? false : !strict;
+  return predicate(value);
+}
+
+function isNonEmptyStringArray(value) {
+  return Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string" && item.trim().length > 0);
 }
 
 export function hostMatches(pattern, hostname) {

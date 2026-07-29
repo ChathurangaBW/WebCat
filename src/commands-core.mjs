@@ -8,9 +8,10 @@ import { PROFILES } from "./swarm.mjs";
 import { BURP_SKILLS, listBurpPresets } from "./burp.mjs";
 import { redact } from "./redact.mjs";
 import { createRuntime, configTemplate, engagementTemplate, mcpTemplate } from "./commands-runtime.mjs";
-import { exists, flag, positionals, printJson, printTable } from "./cli-utils.mjs";
+import { assertKnownOptions, exists, flag, hasFlag, positionals, printJson, printTable } from "./cli-utils.mjs";
 
 export async function initCommand(args, { cwd }) {
+  assertKnownOptions(args, ["--force"]);
   const paths = projectPaths(cwd);
   const force = args.includes("--force");
   await mkdir(paths.project, { recursive: true, mode: 0o700 });
@@ -42,6 +43,7 @@ export async function doctorCommand(args, context) {
 export async function pathsCommand(args, context) { const payload = { user: context.users, project: projectPaths(context.cwd) }; if (args.includes("--json")) printJson(payload); else printTable(Object.entries(payload.user).map(([name, detail]) => ({ name, detail }))); return 0; }
 
 export async function scopeCheckCommand(args, context) {
+  assertKnownOptions(args, ["--operation"]);
   const [target] = positionals(args, ["--operation"]);
   if (!target) throw new Error("scope-check requires a target URL");
   const operation = flag(args, "--operation") ?? "passive";
@@ -54,12 +56,18 @@ export async function scopeCheckCommand(args, context) {
 export function profilesCommand(args) { if (args.includes("--json")) printJson(PROFILES); else printTable(PROFILES.map((item) => ({ name: item.name, capabilities: item.capabilities.join(", "), skills: item.skills?.join(", ") ?? "", purpose: item.purpose }))); return 0; }
 
 export async function mcpCommand(args, context) {
+  assertKnownOptions(args, ["--args", "--approve"]);
   const [action = "status", serverName, toolName] = positionals(args, ["--args"]);
   const runtime = await createRuntime(context);
   try {
     if (action === "status") {
       const rows = runtime.manager.servers().map((server) => ({ name: server.name, preset: server.preset ?? "", transport: server.transport, enabled: server.enabled !== false, endpoint: server.command ?? server.url }));
       if (args.includes("--json")) printJson(rows); else printTable(rows);
+      return 0;
+    }
+    if (action === "refresh") {
+      await runtime.manager.refresh(serverName);
+      console.log(serverName ? `Refreshed MCP tool cache for ${serverName}.` : "Refreshed all MCP tool caches.");
       return 0;
     }
     if (action === "tools") {
@@ -79,7 +87,7 @@ export async function mcpCommand(args, context) {
       const tool = tools.find((item) => item.name === toolName);
       if (!tool) throw new Error(`MCP tool ${toolName} was not discovered`);
       const input = JSON.parse(flag(args, "--args") ?? "{}");
-      const result = await runtime.guard.call(serverName, tool, input, { approve: args.includes("--approve") });
+      const result = await runtime.guard.call(serverName, tool, input, { approve: hasFlag(args, "--approve") });
       printJson(result);
       return 0;
     }
@@ -118,6 +126,7 @@ export async function burpCommand(args, context) {
 }
 
 export async function approvalsCommand(args, context) {
+  assertKnownOptions(args, ["--risk", "--ttl", "--reason", "--server", "--tool", "--target"]);
   const [action = "list", id] = positionals(args, ["--risk", "--ttl", "--reason", "--server", "--tool", "--target"]);
   const store = new ApprovalStore(projectPaths(context.cwd).approvals);
   if (action === "list") { const values = await store.list(); args.includes("--json") ? printJson(values) : printTable(values); return 0; }

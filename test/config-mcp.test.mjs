@@ -52,6 +52,6 @@ test("invalid MCP configuration is rejected", async () => {
     const project = join(temp, "project");
     await mkdir(projectPaths(project).project, { recursive: true });
     await writeFile(projectPaths(project).mcp, JSON.stringify({ servers: { broken: { transport: "stdio" } } }));
-    await assert.rejects(() => loadMcpConfig(project, { userPaths: userPaths({ platform: "linux", home: temp, env: { WEBCAT_HOME: join(temp, "home") } }) }), /requires command/);
+    await assert.rejects(() => loadMcpConfig(project, { userPaths: userPaths({ platform: "linux", home: temp, env: { WEBCAT_HOME: join(temp, "home") } }) }), /requires a non-empty command/);
   } finally { await rm(temp, { recursive: true, force: true }); }
 });

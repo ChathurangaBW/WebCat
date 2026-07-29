@@ -3,6 +3,7 @@ import { IDENTITY } from "./identity.mjs";
 import { projectPaths, userPaths } from "./paths.mjs";
 import { parseToml } from "./toml.mjs";
 import { resolveBurpPreset } from "./burp.mjs";
+import { isUsableAllowRule } from "./scope.mjs";
 
 export const DEFAULT_CONFIG = Object.freeze({
   model: Object.freeze({ provider: "mock", baseUrl: "http://127.0.0.1:11434/v1", apiKeyEnv: "WEBCAT_MODEL_API_KEY", model: "webcat-local", timeoutMs: 120000 }),
@@ -62,7 +63,16 @@ function validateEngagement(value) {
   for (const key of ["id", "name", "authorizedBy", "authorizationReference", "startsAt", "expiresAt", "mode"]) if (typeof value[key] !== "string" || !value[key].trim()) throw new Error(`Engagement ${key} is required`);
   if (!["observe", "manual", "authorized-auto"].includes(value.mode)) throw new Error("Invalid engagement mode");
   if (!Array.isArray(value.allow) || value.allow.length === 0) throw new Error("Engagement allow rules are required");
+  value.allow.forEach((rule, index) => {
+    if (isUsableAllowRule(rule)) return;
+    const label = rule?.id ? `"${rule.id}"` : `at index ${index}`;
+    throw new Error(`Engagement allow rule ${label} is malformed: it must be an object with a non-empty hosts array of strings, and any schemes/paths/operations/ports must be non-empty arrays`);
+  });
   if (!Array.isArray(value.deny)) value.deny = [];
+  value.deny.forEach((rule, index) => {
+    if (rule && typeof rule === "object" && !Array.isArray(rule)) return;
+    throw new Error(`Engagement deny rule at index ${index} must be an object`);
+  });
   if (!isObject(value.rateLimit)) value.rateLimit = { requestsPerMinute: 30, maxParallel: 2 };
   if (!isObject(value.riskPolicy)) value.riskPolicy = { allowHighRisk: false, allowDestructive: false, approvalTtlMinutes: 20 };
 }
@@ -72,8 +82,11 @@ function validateMcpConfig(value) {
   for (const [name, server] of Object.entries(value.servers)) {
     if (!isObject(server)) throw new Error(`MCP server ${name} must be an object`);
     if (!["stdio", "http", "sse"].includes(server.transport)) throw new Error(`MCP server ${name} has invalid transport`);
-    if (server.transport === "stdio" && typeof server.command !== "string") throw new Error(`MCP server ${name} requires command`);
-    if ((server.transport === "http" || server.transport === "sse") && typeof server.url !== "string") throw new Error(`MCP server ${name} requires url`);
+    // Checked after interpolation: an unresolved ${VAR} collapses to "" and would otherwise
+    // surface much later as an opaque spawn/fetch failure.
+    if (server.transport === "stdio" && !isNonEmptyString(server.command)) throw new Error(`MCP server ${name} requires a non-empty command (check that any \${VAR} placeholders are exported)`);
+    if ((server.transport === "http" || server.transport === "sse") && !isNonEmptyString(server.url)) throw new Error(`MCP server ${name} requires a non-empty url (check that any \${VAR} placeholders are exported)`);
+    if ((server.transport === "http" || server.transport === "sse") && !/^https?:\/\//i.test(server.url.trim())) throw new Error(`MCP server ${name} url must be an absolute http(s) URL`);
     if (server.enabledTools && !Array.isArray(server.enabledTools)) throw new Error(`MCP server ${name} enabledTools must be an array`);
     if (server.disabledTools && !Array.isArray(server.disabledTools)) throw new Error(`MCP server ${name} disabledTools must be an array`);
     if (server.capabilityMap && !isObject(server.capabilityMap)) throw new Error(`MCP server ${name} capabilityMap must be an object`);
@@ -85,3 +98,4 @@ function validateMcpConfig(value) {
 function interpolate(value, env) { if (typeof value === "string") return value.replace(/\$\{([A-Z0-9_]+)\}/g, (_, key) => env[key] ?? ""); if (Array.isArray(value)) return value.map((entry) => interpolate(entry, env)); if (isObject(value)) return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, interpolate(entry, env)])); return value; }
 function positive(value, name) { if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be a positive number`); }
 function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
+function isNonEmptyString(value) { return typeof value === "string" && value.trim().length > 0; }
